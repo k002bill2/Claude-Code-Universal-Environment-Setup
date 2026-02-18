@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Write(src/**)",
+      "Write(tests/**)",
+      "Write(docs/**)",
+      "Edit(src/**)",
+      "Edit(tests/**)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Write(.env*)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(git push --force*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[Hook] File modified: check types and tests'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/skill-activator.js \"$PROMPT\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

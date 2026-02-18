@@ -1,0 +1,65 @@
+{
+  "code-reviewer": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["review", "code review", "PR", "pull request", "check code", "quality"],
+      "intentPatterns": [
+        "(review|check|analyze).*?(code|changes|PR|pull request)",
+        "(code|quality).*?(review|check|audit)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/**/*"],
+      "contentPatterns": []
+    }
+  },
+  "test-runner": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["test", "testing", "coverage", "unit test", "integration test", "e2e"],
+      "intentPatterns": [
+        "(run|write|create|fix|add).*?test",
+        "(test|coverage).*?(report|analysis|improve)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["tests/**/*", "**/*.test.*", "**/*.spec.*"],
+      "contentPatterns": ["describe\\(", "it\\(", "test\\(", "expect\\("]
+    }
+  },
+  "docs-generator": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["documentation", "docs", "readme", "api docs", "jsdoc", "docstring"],
+      "intentPatterns": [
+        "(generate|create|update|write).*?(doc|documentation|readme)",
+        "(api|code).*?document"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["docs/**/*", "**/README.md", "**/*.md"],
+      "contentPatterns": []
+    }
+  },
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Skill activation rules - customize keywords and patterns for your project",
+    "enforcement_levels": {
+      "block": "Blocks task until skill is consulted (use for critical operations)",
+      "require": "Required to follow skill guidelines",
+      "suggest": "Recommended but not mandatory"
+    },
+    "priority_levels": {
+      "critical": "Always checked on every prompt",
+      "high": "Checked when related keywords detected",
+      "normal": "Checked when file triggers match",
+      "low": "Only on explicit request"
+    }
+  }
+}
