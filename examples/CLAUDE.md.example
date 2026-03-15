@@ -1,0 +1,76 @@
+# CLAUDE.md
+
+## Project Overview
+
+**MyApp** - React + FastAPI 기반 웹 애플리케이션
+
+## Directory Structure
+
+```
+myapp/
+├── src/
+│   ├── backend/          # Python (FastAPI)
+│   │   ├── api/          # API 라우터
+│   │   ├── services/     # 비즈니스 로직
+│   │   ├── db/           # SQLAlchemy ORM
+│   │   └── models/       # 데이터 모델
+│   └── frontend/         # React (Vite + Tailwind)
+│       ├── components/   # UI 컴포넌트
+│       ├── pages/        # 페이지
+│       ├── stores/       # Zustand 스토어
+│       └── hooks/        # 커스텀 훅
+├── tests/                # 테스트
+├── infra/                # Docker, 스크립트
+└── docs/                 # 문서
+```
+
+## Tech Stack
+
+| Layer | Stack |
+|-------|-------|
+| Backend | FastAPI, SQLAlchemy 2.0, PostgreSQL |
+| Frontend | React 18, Zustand, Tailwind CSS, Vite, TypeScript |
+| Infrastructure | Docker, nginx |
+
+## Quick Start
+
+```bash
+# Backend
+cd src/backend && pip install -e . && uvicorn api.app:app --reload
+
+# Frontend
+cd src/frontend && npm install && npm run dev
+```
+
+**URLs**: Backend `localhost:8000`, Frontend `localhost:5173`
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/check-health` | Type check, lint, test, build verification |
+| `/verify-app` | Boris Cherny style verification loop |
+
+## Environment Variables
+
+```bash
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/myapp
+SECRET_KEY=your-secret-key
+```
+
+## Testing
+
+```bash
+# Backend
+cd src/backend && pytest
+
+# Frontend
+cd src/frontend && npm test
+```
+
+## Key Features
+
+- User authentication (OAuth + Email/Password)
+- RESTful API with OpenAPI docs
+- Real-time WebSocket notifications
+- Responsive dashboard UI

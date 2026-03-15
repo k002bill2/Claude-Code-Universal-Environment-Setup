@@ -1,0 +1,80 @@
+# CLAUDE.md
+
+## Project Overview
+
+**[Project Name]** - [한 줄 프로젝트 설명]
+
+## Directory Structure
+
+```
+[project-name]/
+├── src/              # 소스 코드
+├── tests/            # 테스트
+├── docs/             # 문서
+└── ...
+```
+
+## Tech Stack
+
+| Layer | Stack |
+|-------|-------|
+| Backend | [framework, language, DB] |
+| Frontend | [framework, language, styling] |
+| Infrastructure | [Docker, CI/CD, etc.] |
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+[install command]
+
+# 2. Run development server
+[dev command]
+
+# 3. Run tests
+[test command]
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/check-health` | Type check, lint, test, build verification |
+| `/verify-app` | Boris Cherny style verification loop |
+
+## Rules
+
+Project rules are auto-loaded from `.claude/rules/`:
+- Add project-specific rules as needed
+
+Global rules (`~/.claude/rules/`):
+- `golden-principles.md` - DRY, KISS, YAGNI
+- `security.md` - Security rules
+- `verification.md` - Verification rules
+- `interaction.md` - Communication rules
+
+## Environment Variables
+
+```bash
+# Required
+# [KEY]=...
+
+# Optional
+# [KEY]=...
+```
+
+## Testing
+
+```bash
+# Unit tests
+[test command]
+
+# Coverage
+[coverage command]
+```
+
+## Key Features
+
+- [Feature 1]
+- [Feature 2]
+- [Feature 3]

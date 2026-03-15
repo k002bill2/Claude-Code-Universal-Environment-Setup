@@ -1,151 +1,134 @@
 # Claude Code Universal Environment Setup
 
-Claude Code 프로젝트 환경을 빠르게 구축하기 위한 범용 설치 패키지입니다.
+Production-tested Claude Code 설정을 새 프로젝트에 빠르게 적용하는 starter kit.
+
+8개 프로젝트 운영 경험에서 추출한 **범용(Universal)** 설정만 포함합니다.
+
+## What's Included
+
+### Global Settings (`~/.claude/`)
+프로젝트에 무관하게 모든 Claude Code 세션에 적용되는 설정:
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| Rules | 4 | 코딩 원칙, 보안, 검증, 소통 규칙 |
+| Skills | 19 | 워크플로우, Git, 검증, 에이전트 관리 |
+
+### Project Settings (`.claude/`)
+개별 프로젝트에 복사하여 사용하는 템플릿:
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| Skills | 3 | Feature Planning, Verification Loop, Verify Implementation |
+| Agents | 2 | Code Reviewer, Quality Validator |
+| Commands | 3 | check-health, verify-app, auto pipeline |
+| Hooks | 1 | Base hooks.json template |
+
+### CLAUDE.md Template
+프로젝트별 CLAUDE.md 생성을 위한 템플릿 (200줄 이하 가이드라인 준수).
 
 ## Quick Start
 
 ```bash
-# 1. 설치 스크립트 실행
-bash install.sh /path/to/your/project
+# 1. Clone
+git clone https://github.com/k002bill2/Claude-Code-Universal-Environment-Setup.git
+cd Claude-Code-Universal-Environment-Setup
 
-# 2. 대화형 설정 따라가기
-# - 프로젝트 타입 선택
-# - 설치할 기능 선택
-# - 프로젝트 정보 입력
+# 2. Install (interactive)
+./install.sh
 
-# 3. 설치 완료 후 Claude Code 실행
-cd /path/to/your/project
-claude
+# 3. Options
+./install.sh --global-only      # Global 설정만 설치
+./install.sh --project /path    # 특정 프로젝트에 설정 복사
+./install.sh --dry-run          # 변경사항 미리보기
 ```
 
-## 설치되는 구조
+## Directory Structure
 
 ```
-your-project/
-├── CLAUDE.md                          # 프로젝트 가이드 (가장 중요!)
-├── .claudecode.json                   # 권한 & 훅 설정
-├── .mcp.json                          # MCP 서버 설정
-├── skill-rules.json                   # Skills 자동 활성화 규칙
-├── .claude/
-│   ├── skills/                        # Agent Skills
-│   │   ├── code-reviewer/SKILL.md     # 코드 리뷰
-│   │   ├── test-runner/SKILL.md       # 테스트 실행
-│   │   └── docs-generator/SKILL.md    # 문서 생성
-│   ├── agents/                        # Sub-agents
-│   │   ├── frontend-specialist.md     # 프론트엔드 전문가
-│   │   ├── backend-specialist.md      # 백엔드 전문가
-│   │   ├── test-engineer.md           # 테스트 엔지니어
-│   │   └── shared/                    # 공유 프레임워크
-│   │       ├── quality-gates.md       # 품질 게이트
-│   │       ├── effort-scaling.md      # 작업 규모 가이드
-│   │       └── parallel-agents-protocol.md  # 병렬 실행 프로토콜
-│   ├── commands/                      # 커스텀 슬래시 명령어
-│   │   ├── dev-docs.md                # /dev-docs
-│   │   ├── update-dev-docs.md         # /update-dev-docs
-│   │   ├── verify.md                  # /verify
-│   │   ├── review.md                  # /review
-│   │   └── resume.md                  # /resume
-│   └── hooks/                         # Hook 스크립트
-│       ├── skill-activator.js         # Skills 자동 활성화
-│       └── post-edit-check.sh         # 편집 후 검사
-└── dev/                               # Dev Docs (대규모 작업용)
-    ├── active/                        # 진행 중 작업
-    └── completed/                     # 완료된 작업
+.
+├── global/                     # → ~/.claude/ 에 설치
+│   ├── rules/                  # 글로벌 규칙 (4개)
+│   └── skills/                 # 범용 스킬 (19개)
+├── project/                    # → .claude/ 에 복사
+│   ├── skills/                 # 프로젝트 스킬 템플릿
+│   ├── agents/                 # 에이전트 템플릿
+│   ├── commands/               # 커맨드 템플릿
+│   └── hooks.json              # 기본 hooks
+├── examples/
+│   └── CLAUDE.md.example       # CLAUDE.md 예시
+├── CLAUDE.md.template          # CLAUDE.md 템플릿
+├── install.sh                  # 설치 스크립트
+└── README.md
 ```
 
-## 핵심 구성요소
+## Customization
 
-### 1. CLAUDE.md
-프로젝트 컨텍스트 파일. Claude Code가 프로젝트를 이해하는 핵심 문서.
-
-### 2. Skills (`.claude/skills/`)
-재사용 가능한 전문 지식 모듈:
-- **code-reviewer**: 코드 품질, 보안, 성능 리뷰
-- **test-runner**: 테스트 실행, 커버리지 분석
-- **docs-generator**: 문서 자동 생성
-
-### 3. Sub-agents (`.claude/agents/`)
-독립 컨텍스트를 가진 전문 에이전트:
-- **frontend-specialist**: React/TypeScript UI 개발
-- **backend-specialist**: API, DB, 서비스 아키텍처
-- **test-engineer**: 테스트 자동화
-
-### 4. Commands (`.claude/commands/`)
-커스텀 슬래시 명령어:
-| Command | Description |
-|---------|-------------|
-| `/dev-docs <name>` | 3-파일 Dev Docs 생성 |
-| `/update-dev-docs` | Dev Docs 업데이트 |
-| `/verify` | 타입체크+린트+테스트+빌드 |
-| `/review` | 코드 리뷰 |
-| `/resume` | 이전 작업 컨텍스트 복원 |
-
-### 5. Skill Auto-Activation
-`skill-rules.json`에 정의된 키워드/패턴 매칭으로 Skills를 자동 활성화하는 Hook 시스템.
-
-### 6. Dev Docs System
-대규모 작업의 컨텍스트를 3개 파일로 관리:
-- `plan.md`: 승인된 계획
-- `context.md`: 핵심 결정사항과 현재 상태
-- `tasks.md`: 체크리스트
-
-## 커스터마이징
-
-### CLAUDE.md 수정
-설치 후 반드시 프로젝트에 맞게 수정하세요:
-- 실제 디렉토리 구조
-- 기술 스택 상세
-- 코딩 컨벤션
-- 보안 규칙
-
-### skill-rules.json 수정
-프로젝트 도메인에 맞는 키워드/패턴 추가:
-```json
-{
-  "my-custom-skill": {
-    "type": "domain",
-    "enforcement": "suggest",
-    "priority": "high",
-    "promptTriggers": {
-      "keywords": ["my-keyword"],
-      "intentPatterns": ["(create|add).*?my-pattern"]
-    }
-  }
-}
+### Rules 커스터마이징
+`global/rules/interaction.md`에서 언어 설정을 변경:
+```markdown
+# 기본값: 한국어
+- 한국어로 소통
+# 영어로 변경 시:
+- Communicate in English
 ```
 
-### 새 Skill 추가
-```bash
-mkdir -p .claude/skills/my-skill
-# SKILL.md 작성 (frontmatter + instructions)
-```
+### 프로젝트별 스킬 추가
+`project/skills/` 에 프로젝트 특화 스킬을 추가한 후 `install.sh --project` 실행.
 
-### 새 Agent 추가
-```bash
-# .claude/agents/my-agent.md 생성
-# frontmatter: name, description, tools, model
-```
+### Hooks 설정
+`project/hooks.json`을 프로젝트 요구사항에 맞게 수정.
 
-## 요구사항
+## Skill Categories
 
-- macOS / Linux / WSL
-- Node.js v18+
-- Git
-- Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+### Workflow & Planning
+| Skill | Purpose |
+|-------|---------|
+| `dev-docs` | 대규모 작업을 위한 3-파일 문서 시스템 |
+| `update-dev-docs` | Context Compaction 전 문서 업데이트 |
+| `save-and-compact` | 저장 후 compact 안내 |
+| `resume` | 이전 세션 컨텍스트 복원 |
+| `feature-planner` | TDD 기반 단계별 기능 계획 |
+| `run-workflow` | YAML DAG 기반 워크플로우 실행 |
 
-## 기반 자료
+### Git & Code Quality
+| Skill | Purpose |
+|-------|---------|
+| `commit-push-pr` | Conventional Commits + PR 자동화 |
+| `draft-commits` | 변경사항 분석 및 커밋 초안 |
+| `review` | Git diff 기반 코드 리뷰 |
+| `simplify-code` | 코드 복잡도 분석 및 단순화 |
+| `verification-loop` | Boris Cherny 스타일 검증 루프 |
+| `verify-implementation` | 모든 verify 스킬 순차 실행 |
 
-이 설치 패키지는 다음 가이드를 분석하여 범용화한 결과입니다:
-- Claude Code 완벽 가이드북 2025
-- Skills 자동 활성화 시스템
-- Dev Docs 3-파일 시스템
-- Parallel Agents Safety Protocol v3.0.1
-- 프로젝트별 템플릿 모음
-- 실전 예제 모음
+### Infrastructure & Meta
+| Skill | Purpose |
+|-------|---------|
+| `skill-creator` | 새 스킬 생성 가이드 |
+| `subagent-creator` | 서브에이전트 생성 가이드 |
+| `hook-creator` | 훅 생성 가이드 |
+| `slash-command-creator` | 슬래시 커맨드 생성 가이드 |
+| `config-backup` | .claude/ 설정 백업/복원 |
+| `cli-orchestration` | CLI 병렬/순차/DAG 실행 |
 
----
+### Multi-Agent Governance
+| Skill | Purpose |
+|-------|---------|
+| `ace-framework` | 4-Pillar 거버넌스 모델 |
+| `agent-improvement` | 에이전트 자기개선 루프 |
+| `agent-observability` | 프로덕션 추적 및 메트릭 |
+| `external-memory` | 장기 실행 컨텍스트 지속성 |
 
-*Version: 1.0.0*
-# Claude-Code-Universal-Environment-Setup
-# Claude-Code-Universal-Environment-Setup
-# Claude-Code-Universal-Environment-Setup
+## Origin
+
+이 설정은 다음 프로젝트들의 운영 경험에서 추출되었습니다:
+- Agent-System (AOS) - 멀티 에이전트 오케스트레이션
+- AOS_web - 웹 대시보드
+- image-maker - AI 이미지 생성
+- youtube-maker - AI 영상 제작
+- ppt-maker - AI 프레젠테이션
+- LiveMetro - 실시간 지하철 앱
+
+## License
+
+MIT
