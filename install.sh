@@ -19,6 +19,8 @@ set -euo pipefail
 #   --with-advisor       codex-advisor-worker-bundle 설치 위임
 #   --with-examples      examples/ 자산을 프로젝트에 설치
 #   --with-pm2           PM2 템플릿을 <project>/docs/templates/pm2/ 로 복사
+#                        + pm2-hooks fragment 를 settings.json 에 병합
+#                        (명시했을 때만 — --full 만으로는 병합하지 않는다)
 #   --with-verify-hooks  verification-hooks fragment 를 settings.json 에 병합
 #   -h, --help           도움말
 #
@@ -41,6 +43,7 @@ SYSTEM_SETUP_INSTALLER="${SCRIPT_DIR}/docs/Claude code system setup/install.sh"
 ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
 SAFETY_DOC_SRC="${SCRIPT_DIR}/docs/Claude code system setup/Parallel Agents Safety Protocol v3.1.0.md"
 FRAGMENTS_DIR="${SCRIPT_DIR}/project/settings-fragments"
+HOOKS_SRC_DIR="${SCRIPT_DIR}/project/hooks"
 
 # 공용 병합 엔진
 # shellcheck source=lib/merge-settings.sh
@@ -55,6 +58,9 @@ WITH_EXAMPLES=false
 WITH_PM2=false
 WITH_VERIFY_HOOKS=false
 INSTALL_VERIFY_FRAGMENT=false
+# pm2-hooks 조각의 settings.json 병합은 --with-pm2 를 "명시"했을 때만.
+# --full 은 settings.json 배선을 늘리지 않는다(verify-hooks 와 동일한 기존 규칙).
+PM2_HOOKS_MERGE=false
 ANY_FLAG=false
 GUARDRAILS_SKIPPED=false
 
@@ -86,7 +92,7 @@ usage() {
     echo "                       + verify-hooks fragment file (merge only with --with-verify-hooks)"
     echo "  --with-advisor       Delegate to codex-advisor-worker-bundle installer"
     echo "  --with-examples      Install examples/ assets into the project"
-    echo "  --with-pm2           Copy PM2 templates to <project>/docs/templates/pm2/"
+    echo "  --with-pm2           Copy PM2 templates + merge pm2-hooks fragment (explicit flag only)"
     echo "  --with-verify-hooks  Merge verification-hooks fragment into settings.json"
     echo "  -h, --help           Show this help"
 }
@@ -105,7 +111,7 @@ while [[ $# -gt 0 ]]; do
         --full)              FULL=true; ANY_FLAG=true; shift ;;
         --with-advisor)      WITH_ADVISOR=true; ANY_FLAG=true; shift ;;
         --with-examples)     WITH_EXAMPLES=true; ANY_FLAG=true; shift ;;
-        --with-pm2)          WITH_PM2=true; ANY_FLAG=true; shift ;;
+        --with-pm2)          WITH_PM2=true; PM2_HOOKS_MERGE=true; ANY_FLAG=true; shift ;;
         --with-verify-hooks) WITH_VERIFY_HOOKS=true; ANY_FLAG=true; shift ;;
         -h|--help)           usage; exit 0 ;;
         *)                   log_error "Unknown option: $1"; usage; exit 1 ;;
@@ -395,6 +401,33 @@ install_project_assets() {
 }
 
 # ──────────────────────────────────────────────────────
+# Step 2a-2: 실행형 훅 스크립트 (.claude/hooks/*.sh) — 관리 파일 정책 + chmod +x
+#   파일은 항상 설치한다(배선과 무관). settings.json 배선은 옵트인 플래그가 결정:
+#   stop-self-check/build-checker → --with-verify-hooks, PM2 2종 → --with-pm2.
+#   system-setup 위임분(skill-activator.sh, pre-compact-reminder.sh)과 이름이
+#   겹치지 않으며, 그쪽도 파일 단위로 쓰므로 서로 덮어쓰지 않는다.
+# ──────────────────────────────────────────────────────
+install_project_hooks() {
+    local claude_dir="${PROJECT_DIR}/.claude"
+    local f name dst
+    if [ ! -d "$HOOKS_SRC_DIR" ]; then
+        log_warn "project/hooks 소스 없음 — 스킵"
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+        return 0
+    fi
+    for f in "${HOOKS_SRC_DIR}/"*.sh; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        dst="${claude_dir}/hooks/${name}"
+        install_managed_file "$f" "$dst" ".claude/hooks/${name}"
+        # dry-run 은 파일을 만들지 않으므로 chmod 를 시도하면 set -e 로 전체가 죽는다.
+        if ! $DRY_RUN && [ -f "$dst" ]; then
+            chmod +x "$dst"
+        fi
+    done
+}
+
+# ──────────────────────────────────────────────────────
 # Step 2b: settings.json fragment 병합
 # 주의: settings.json 을 이 단계(위임 이전)에서 먼저 생성/병합해 두므로,
 #       Step 3 의 system-setup install.sh 는 "기존 settings 존재" 경로
@@ -427,6 +460,11 @@ install_project_settings() {
     if $WITH_VERIFY_HOOKS; then
         merge_fragment_into "$settings" "${FRAGMENTS_DIR}/verification-hooks.json" \
             ".claude/settings.json <- verification-hooks.json"
+    fi
+    # PM2 훅 배선: --with-pm2 를 명시했을 때만 (--full 만으로는 배선하지 않는다)
+    if $PM2_HOOKS_MERGE; then
+        merge_fragment_into "$settings" "${FRAGMENTS_DIR}/pm2-hooks.json" \
+            ".claude/settings.json <- pm2-hooks.json"
     fi
 }
 
@@ -552,8 +590,10 @@ print_checklist() {
     echo "     --with-verify-hooks 명시 시에만 settings.json 에 병합됩니다"
     echo "     (tsc/lint 자동 훅 — 프로젝트 스택에 맞게 명령 조정 권장)."
     echo "  5. GSD / Gstack 은 별도 마켓플레이스에서 설치 (본 설치기 범위 밖)."
-    echo "  6. 개념용 훅 4종(stop 자가검증·buildChecker·postToolUseFailure·serviceHealthCheck)은"
-    echo "     실행형 소스가 docs 에 없어 v1 설치 범위 밖입니다 (문서 참조용)."
+    echo "  6. 실행형 훅 4종은 .claude/hooks/ 에 항상 설치됩니다(파일만):"
+    echo "       stop-self-check.sh / build-checker.sh  -> --with-verify-hooks 로 배선"
+    echo "       post-tool-failure.sh / service-health-check.sh -> --with-pm2 로 배선"
+    echo "     전부 advisory(항상 exit 0)이며 jq(PM2 훅은 pm2)가 없으면 무동작합니다."
     if $GUARDRAILS_SKIPPED; then
         echo "  7. guardrails 훅(위험 Bash 차단·보호 파일 쓰기 차단)은 python3 가 없어"
         echo "     settings.json 병합을 스킵했습니다 — python3 설치 후 재실행하면 자동 병합됩니다."
@@ -598,6 +638,7 @@ install_global
 
 if ! $GLOBAL_ONLY && [ -n "$PROJECT_DIR" ]; then
     install_project_assets
+    install_project_hooks
     install_project_settings
     install_project_extras
     echo ""

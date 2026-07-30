@@ -27,10 +27,10 @@ cd Claude-Code-Universal-Environment-Setup
 | `--project PATH` | 프로젝트 자산(.claude/ 스킬·에이전트·커맨드·settings 병합 등)을 PATH에 설치 |
 | `--global-only` | 글로벌 단계(~/.claude/ rules·skills)만 실행 |
 | `--dry-run` | 모든 쓰기·하위 설치기 위임을 `[DRY RUN] Would ...`로만 출력, 실제 실행 없음 |
-| `--full` | `--with-advisor` + `--with-examples` + `--with-pm2` + verify-hooks 조각 파일 설치 (settings 병합은 `--with-verify-hooks` 명시 시에만) |
+| `--full` | `--with-advisor` + `--with-examples` + `--with-pm2` + verify-hooks 조각 파일 설치 (settings 병합은 `--with-verify-hooks` / `--with-pm2` 를 **명시**했을 때만) |
 | `--with-advisor` | codex-advisor-worker-bundle 설치기 위임 (조언자–작업자–검증 체계) |
 | `--with-examples` | `examples/` 스킬·에이전트를 프로젝트 `.claude/`에 추가 설치 |
-| `--with-pm2` | PM2 백엔드 디버깅 템플릿을 `<project>/docs/templates/pm2/`에 복사 |
+| `--with-pm2` | PM2 템플릿을 `<project>/docs/templates/pm2/`에 복사 + pm2-hooks 조각을 `settings.json`에 병합 |
 | `--with-verify-hooks` | verify-hooks 조각을 `.claude/settings.json`에 실제 병합 |
 | `-h` / `--help` | 사용법 출력 |
 
@@ -48,7 +48,8 @@ cd Claude-Code-Universal-Environment-Setup
 │   ├── skills/                 # → .claude/skills/
 │   ├── agents/                 # → .claude/agents/ (7종)
 │   ├── commands/               # → .claude/commands/
-│   ├── settings-fragments/     # guardrails.json + cli-orchestration.json → settings.json 병합
+│   ├── hooks/                  # → .claude/hooks/*.sh (실행형 advisory 훅 4종, chmod +x)
+│   ├── settings-fragments/     # guardrails/cli-orchestration(항상) + verification-hooks/pm2-hooks(옵트인)
 │   ├── skill-rules.json        # → .claude/skill-rules.json (skip-if-exists)
 │   └── mcp.json.example        # → <project>/.mcp.json.example (skip-if-exists)
 ├── examples/                   # --with-examples 옵트인 스킬·에이전트
@@ -72,10 +73,10 @@ cd Claude-Code-Universal-Environment-Setup
 | 시스템 셋업 가이드 본체 (Dev Docs, Skills 자동 활성화 등) | system-setup `install.sh` 위임 |
 | 조언자–작업자–검증(Codex) 체계 | advisor-worker `install.sh` 위임 (`--with-advisor`/`--full`) |
 | Agent Skills 예시 모음 | `--with-examples` 옵트인 |
-| PM2 백엔드 디버깅 | `--with-pm2` 옵트인 (템플릿 복사) |
+| PM2 백엔드 디버깅 | `--with-pm2` 옵트인 (템플릿 복사 + pm2-hooks 병합) |
 | verify-hooks settings 병합 | `--with-verify-hooks` 옵트인 |
 | codex 플러그인·login, MCP 시크릿, GSD/Gstack, pm2-logrotate | POST-INSTALL 체크리스트 수동 |
-| 개념용 훅 4종 (stop 자가검증·buildChecker·postToolUseFailure·serviceHealthCheck) | v1 범위 밖 (아래 참조) |
+| 실행형 훅 4종 (stop 자가검증·build-checker·post-tool-failure·service-health-check) | 루트 직접 → `.claude/hooks/` (파일은 항상, 배선은 옵트인 — 아래 참조) |
 
 ## Install Policy (파일 정책 · 멱등성)
 
@@ -89,9 +90,21 @@ cd Claude-Code-Universal-Environment-Setup
 
 **멱등성 계약**: 같은 명령의 2회차 실행은 변경 0건이어야 합니다. 병합 엔진은 신규 생성 시에도 병합 경로와 동일한 직렬화로 정규화해 이 계약을 보장합니다.
 
+## 실행형 훅 4종 (`project/hooks/`)
+
+docs의 TypeScript 개념 스켈레톤을 **실행 가능한 bash**로 재작성한 것들입니다. 파일은 기본 설치에서도 항상 `.claude/hooks/`에 깔리고 `chmod +x` 되지만, **`settings.json` 배선은 옵트인**입니다 — 즉 플래그 없이 설치하면 파일만 존재하고 아무것도 실행되지 않습니다.
+
+| 훅 | 이벤트 | 배선 플래그 | 동작 |
+|----|--------|------------|------|
+| `stop-self-check.sh` | `Stop` | `--with-verify-hooks` | git 작업트리 변경 파일에서 리스크 패턴(try/async/prisma/throw) 감지 → 자가검증 질문 출력 |
+| `build-checker.sh` | `PostToolUse` (`Edit\|Write`) | `--with-verify-hooks` | `.ts/.tsx` 편집 시 로컬 `node_modules/.bin/tsc --noEmit` 실행 → 오류 요약 |
+| `post-tool-failure.sh` | `PostToolUseFailure` | `--with-pm2` | 실패 도구·점검 순서 안내 + PM2 비정상 서비스 표시 |
+| `service-health-check.sh` | `Stop` | `--with-pm2` | PM2 서비스 중 `status != online` 또는 재시작 5회 초과 감지 (수동 실행도 가능) |
+
+공통 계약: stdin으로 이벤트 JSON 수신, stdout은 advisory 컨텍스트로 주입, **항상 exit 0**(세션 미차단). `jq` 부재 시(PM2 훅은 `pm2` 부재 시에도) 조용한 no-op. 외부 명령은 자체 타임아웃으로 유계 실행하며 `npx` 네트워크 설치는 하지 않습니다.
+
 ## Out of Scope (v1) — 사유
 
-- **개념용 훅 4종** (stop 자가검증, buildChecker, postToolUseFailure, serviceHealthCheck): docs에 개념 설명만 있고 실행형 소스가 없어 설치 대상이 아님. POST-INSTALL 체크리스트에 명시됨.
 - **플러그인 내용물** (codex 플러그인 등): 플러그인 마켓플레이스가 소유하는 영역. 설치 명령만 체크리스트로 안내.
 - **네트워크·세션·계정 결합 단계**: `codex login`, MCP `npx` 서버 기동+시크릿 주입, GSD/Gstack 마켓플레이스 설치 — 비대화형 스크립트가 대신할 수 없는 단계이므로 POST-INSTALL 체크리스트로 안내.
 
@@ -101,7 +114,7 @@ cd Claude-Code-Universal-Environment-Setup
 
 ## Why no hooks.json
 
-과거의 `project/hooks.json`은 폐기되었습니다. Claude Code는 **settings.json에 등록된 훅만 실행**하며 `.claude/hooks.json`은 읽지 않습니다. 훅 정의는 `project/settings-fragments/`의 조각 파일로 이식되어 `.claude/settings.json`에 병합됩니다.
+과거의 `project/hooks.json`은 폐기되었습니다. Claude Code는 **settings.json에 등록된 훅만 실행**하며 `.claude/hooks.json`은 읽지 않습니다. 훅 정의는 `project/settings-fragments/`의 조각 파일로 이식되어 `.claude/settings.json`에 병합됩니다(실행 스크립트 자체는 `project/hooks/*.sh` → `.claude/hooks/`).
 
 ## Origin
 

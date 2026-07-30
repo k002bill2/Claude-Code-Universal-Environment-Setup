@@ -1,7 +1,7 @@
 # HANDOFF — 통합 설치기(one-shot install) 구현
 
-> 작성: 2026-07-31 (같은 날 갱신).
-> 상태: **완료 — Codex 리뷰 통과·조언자 승인.** 테스트 36/36 PASS. 미커밋 (커밋은 사용자 결정 대기).
+> 작성: 2026-07-31 (같은 날 2차 갱신).
+> 상태: **전체 완료** — 커밋 2건(4ffdf01 본체, 5fad7d0 백로그+2차 리뷰 반영), 워킹트리 클린, 스위트 70/70 PASS. 푸시는 미실행.
 
 ## 1. 요청 원문
 
@@ -43,11 +43,15 @@ docs/ 폴더(신규, 미추적)의 내용을 검토해 **폴더 안의 모든 �
 - 최종: `tests/test-install.sh` **36/36 PASS** (A 산출물 18 · B 멱등 4 · C dry-run 3 · D global-only 3 · E 스테일 정리 8). 조언자 승인 완료
 - 주의: 관리 디렉토리 교체 의미론으로 docs/templates/pm2/ 등에 사용자가 **추가**한 파일은 재설치 시 .bak로 이동 (README의 관리 파일 정책과 일치하는 의도된 UX)
 
-## 6. 남은 것 / 백로그
+## 6. 백로그 소진 결과 (2026-07-31 커밋 5fad7d0)
 
-1. **커밋 여부 사용자 결정 대기** (docs/ 원본 포함 여부 포함 — 전부 untracked, mcp.json.example·tests는 intent-to-add 상태)
-2. (백로그) guardrails 병합 성공의 영구 테스트 부재 — Test A는 위임 유래 훅만 검증, 게이트 반전 버그는 일회성 실측으로만 커버됨
-3. (백로그) 개념용 훅 4종 실행형 저작, examples 스킬 references 스텁 실내용 채우기
+1. ~~커밋~~ → 사용자 승인으로 docs/ 포함 전량 커밋 (4ffdf01)
+2. ~~guardrails 영구 테스트~~ → Test A에 python3 게이트 하 영구 어서션 추가
+3. ~~개념용 훅 4종~~ → project/hooks/ 실행형 저작 (advisory 계약: 항상 exit 0, jq/pm2 부재 no-op). 배선은 옵트인 유지: verification-hooks 조각(--with-verify-hooks)에 Stop·PostToolUse 편입, pm2-hooks 조각 신설(--with-pm2) — **기본 설치의 settings 배선 불변**
+4. ~~references 스텁~~ → 5종 실내용 저작(각 94~120줄, SKILL.md 정합)
+- 2차 Codex 리뷰 P2 2건 반영: stop-self-check 스캔 3중 상한(단일 패스·CLAUDE_HOOK_MAX_BYTES 256KB·CLAUDE_HOOK_MAX_SECONDS 3s, Red-Green 검증), api-template GET/POST 분리
+- 스위트 36 → **70 어서션 전체 PASS** (Test F: 옵트인 배선·멱등 검증 신설)
+- 잔여: **푸시 미실행** (사용자 결정 대기). 알려진 트레이드오프는 stop-self-check.sh 소스 주석 참조(부분 스캔 무음, 시간 상한은 파일 간 검사 — 크기 상한이 백스톱)
 
 ## 7. 함정 메모
 

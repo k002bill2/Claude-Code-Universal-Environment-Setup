@@ -167,6 +167,80 @@ else
     fail "A7 ~/.claude/agents/architect.md 없음 (advisor 위임 실패?)"
 fi
 
+# settings.json 안의 모든 command 문자열을 재귀로 수집 (중첩 경로 변화에 견고)
+settings_commands() {
+    jq -r '[.. | objects | .command? // empty] | .[]' "$1" 2>/dev/null
+}
+
+# A8: 실행형 훅 4종 — 파일 존재 + 실행권한 (배선과 무관하게 항상 설치)
+for h in stop-self-check build-checker post-tool-failure service-health-check; do
+    HOOK_FILE="${SANDBOX_PROJECT}/.claude/hooks/${h}.sh"
+    if [ -f "$HOOK_FILE" ] && [ -x "$HOOK_FILE" ]; then
+        pass "A8 .claude/hooks/${h}.sh 존재 + 실행권한"
+    elif [ -f "$HOOK_FILE" ]; then
+        fail "A8 .claude/hooks/${h}.sh 실행권한 없음"
+    else
+        fail "A8 .claude/hooks/${h}.sh 없음"
+    fi
+done
+# 검증의 검증: system-setup 위임 훅과 이름이 겹치지 않고 공존하는지
+if [ -f "${SANDBOX_PROJECT}/.claude/hooks/skill-activator.sh" ]; then
+    pass "A8 system-setup 훅(skill-activator.sh) 공존 (이름 비충돌)"
+else
+    fail "A8 skill-activator.sh 없음 — 위임 훅이 사라짐(이름 충돌/덮어쓰기?)"
+fi
+
+# A9: 기본 설치(--full)의 settings.json 배선 불변 — 신규 훅 4종 미배선
+if [ -f "$SETTINGS" ]; then
+    CMDS_A="$(settings_commands "$SETTINGS")"
+    for needle in stop-self-check build-checker post-tool-failure service-health-check; do
+        if printf '%s\n' "$CMDS_A" | grep -q "$needle"; then
+            fail "A9 --full 인데 settings.json 에 ${needle} 배선됨 (기본 배선 불변 위반)"
+        else
+            pass "A9 settings.json 에 ${needle} 미배선 (--full 기본 배선 불변)"
+        fi
+    done
+    if jq -e '(.hooks // {}) | has("Stop") | not' "$SETTINGS" >/dev/null 2>&1; then
+        pass "A9 settings.json 에 Stop 이벤트 부재 (--full)"
+    else
+        fail "A9 --full 인데 Stop 이벤트가 배선됨"
+    fi
+    # --full 은 verify-hooks "조각 파일"은 깔아야 한다 (파일 O / 배선 X 계약)
+    if [ -f "${SANDBOX_PROJECT}/.claude/settings-fragments/verification-hooks.json" ]; then
+        pass "A9 verification-hooks.json 조각 파일은 설치됨 (--full)"
+    else
+        fail "A9 verification-hooks.json 조각 파일 없음 (--full)"
+    fi
+else
+    fail "A9 settings.json 없음 — 배선 부재 검증 헛돎"
+fi
+
+# A10: guardrails 영구 검증 (python3 게이트 — 미배선 회귀를 잡는다)
+if command -v python3 >/dev/null 2>&1; then
+    if [ -f "$SETTINGS" ]; then
+        if jq -e 'any(.hooks.PreToolUse[]?; .matcher == "Bash")' "$SETTINGS" >/dev/null 2>&1; then
+            pass "A10 guardrails PreToolUse matcher \"Bash\" 배선"
+        else
+            fail "A10 guardrails PreToolUse matcher \"Bash\" 미배선"
+        fi
+        if jq -e 'any(.hooks.PreToolUse[]?; .matcher == "Edit|Write")' "$SETTINGS" >/dev/null 2>&1; then
+            pass "A10 guardrails PreToolUse matcher \"Edit|Write\" 배선"
+        else
+            fail "A10 guardrails PreToolUse matcher \"Edit|Write\" 미배선"
+        fi
+        if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | map(select(startswith("python3"))) | length >= 2' \
+             "$SETTINGS" >/dev/null 2>&1; then
+            pass "A10 guardrails python3 훅 명령 2건 이상 존재"
+        else
+            fail "A10 guardrails python3 훅 명령이 2건 미만 (차단 훅 소실)"
+        fi
+    else
+        fail "A10 settings.json 없음 — guardrails 검증 헛돎"
+    fi
+else
+    echo "SKIP: A10 guardrails 검증 — python3 없음 (설치기가 병합을 스킵하는 환경)"
+fi
+
 # ============================================================================
 # Test B: 멱등성 — 2회차 실행 → 내용 diff 0 + 신규 .bak 0개
 # ============================================================================
@@ -343,6 +417,165 @@ if [ -d "$STALE_SKILL_DIR" ]; then
     fi
 else
     fail "E0 관리 스킬 디렉토리 없음 — 테스트 헛돎: ${STALE_SKILL_DIR}"
+fi
+
+# ============================================================================
+# Test F: 옵트인 훅 배선 (--with-verify-hooks / --with-pm2) + 각각 재실행 멱등
+#   Test A 가 "--full 은 배선하지 않는다"를 지키는지 보는 음성 검증이라면,
+#   여기서는 명시 플래그가 실제로 배선하는지 양성 검증한다. 새 샌드박스를 쓰므로
+#   .bak 카운트는 대상 디렉토리를 인자로 받는 헬퍼로 센다(A~E 의 카운터는 고정 경로).
+# ============================================================================
+echo "=== Test F: opt-in hook wiring (verify-hooks / pm2) ==="
+
+# find 의 -o 우선순위 함정 회피: 그룹 + 명시적 -print
+count_baks_in() {
+    find "$@" \( -name '*.bak' -o -name '*.bak.*' \) -print 2>/dev/null | wc -l | tr -d ' '
+}
+file_hash() {
+    shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+}
+
+# ── F1: --with-verify-hooks → Stop / PostToolUse 배선 ──────────────────
+HOME_F1="${SANDBOX_ROOT}/home-f1"
+PROJ_F1="${SANDBOX_ROOT}/proj-f1"
+mkdir -p "$HOME_F1" "$PROJ_F1"
+LOG_F1="${SANDBOX_ROOT}/run-f1.log"
+HOME="$HOME_F1" bash "$INSTALL" --with-verify-hooks --project "$PROJ_F1" \
+    > "$LOG_F1" 2>&1 < /dev/null
+RC=$?
+if [ "$RC" -eq 0 ]; then
+    pass "F1 --with-verify-hooks exit 0"
+else
+    fail "F1 --with-verify-hooks exit ${RC} (log tail: $(tail -5 "$LOG_F1" | tr '\n' ' '))"
+fi
+
+SET_F1="${PROJ_F1}/.claude/settings.json"
+if [ -f "$SET_F1" ] && jq empty "$SET_F1" >/dev/null 2>&1; then
+    pass "F1 settings.json 유효 JSON"
+    CMDS_F1="$(settings_commands "$SET_F1")"
+    if printf '%s\n' "$CMDS_F1" | grep -q 'stop-self-check\.sh'; then
+        pass "F1 Stop -> stop-self-check.sh 배선"
+    else
+        fail "F1 stop-self-check.sh 미배선"
+    fi
+    if printf '%s\n' "$CMDS_F1" | grep -q 'build-checker\.sh'; then
+        pass "F1 PostToolUse -> build-checker.sh 배선"
+    else
+        fail "F1 build-checker.sh 미배선"
+    fi
+    if jq -e '(.hooks.Stop | length) > 0' "$SET_F1" >/dev/null 2>&1; then
+        pass "F1 Stop 이벤트 배열 존재"
+    else
+        fail "F1 Stop 이벤트 배열 없음"
+    fi
+    if jq -e 'any(.hooks.PostToolUse[]?; .matcher == "Edit|Write")' "$SET_F1" >/dev/null 2>&1; then
+        pass "F1 PostToolUse matcher \"Edit|Write\" 존재"
+    else
+        fail "F1 PostToolUse matcher \"Edit|Write\" 없음"
+    fi
+    # 기존 tsc/lint 항목이 보존되는지 (조각 확장이 기존 배선을 지우지 않았는지)
+    if printf '%s\n' "$CMDS_F1" | grep -q 'npx tsc --noEmit'; then
+        pass "F1 기존 verify-hooks 항목(npx tsc --noEmit) 보존"
+    else
+        fail "F1 기존 verify-hooks 항목(npx tsc --noEmit) 소실"
+    fi
+    if printf '%s\n' "$CMDS_F1" | grep -q 'pm2-hooks\|service-health-check\.sh'; then
+        fail "F1 --with-verify-hooks 인데 pm2 훅이 배선됨 (플래그 누수)"
+    else
+        pass "F1 pm2 훅 미배선 (플래그 분리 유지)"
+    fi
+else
+    fail "F1 settings.json 없음 또는 파싱 불가: ${SET_F1}"
+fi
+
+HASH_F1_BEFORE="$(file_hash "$SET_F1")"
+BAKS_F1_BEFORE="$(count_baks_in "$HOME_F1" "$PROJ_F1")"
+LOG_F1B="${SANDBOX_ROOT}/run-f1b.log"
+HOME="$HOME_F1" bash "$INSTALL" --with-verify-hooks --project "$PROJ_F1" \
+    > "$LOG_F1B" 2>&1 < /dev/null
+RC=$?
+HASH_F1_AFTER="$(file_hash "$SET_F1")"
+BAKS_F1_AFTER="$(count_baks_in "$HOME_F1" "$PROJ_F1")"
+if [ "$RC" -eq 0 ]; then
+    pass "F1 재실행 exit 0"
+else
+    fail "F1 재실행 exit ${RC} (log tail: $(tail -5 "$LOG_F1B" | tr '\n' ' '))"
+fi
+if [ -n "$HASH_F1_BEFORE" ] && [ "$HASH_F1_BEFORE" = "$HASH_F1_AFTER" ]; then
+    pass "F1 재실행 settings.json 불변 (멱등)"
+else
+    fail "F1 재실행에 settings.json 변경됨 (before=${HASH_F1_BEFORE}, after=${HASH_F1_AFTER})"
+fi
+if [ "$BAKS_F1_AFTER" -eq "$BAKS_F1_BEFORE" ]; then
+    pass "F1 재실행 신규 .bak 0개 (before=${BAKS_F1_BEFORE}, after=${BAKS_F1_AFTER})"
+else
+    fail "F1 재실행에 신규 .bak 생성됨 (before=${BAKS_F1_BEFORE}, after=${BAKS_F1_AFTER})"
+fi
+
+# ── F2: --with-pm2 → pm2-hooks 병합 ────────────────────────────────────
+HOME_F2="${SANDBOX_ROOT}/home-f2"
+PROJ_F2="${SANDBOX_ROOT}/proj-f2"
+mkdir -p "$HOME_F2" "$PROJ_F2"
+LOG_F2="${SANDBOX_ROOT}/run-f2.log"
+HOME="$HOME_F2" bash "$INSTALL" --with-pm2 --project "$PROJ_F2" \
+    > "$LOG_F2" 2>&1 < /dev/null
+RC=$?
+if [ "$RC" -eq 0 ]; then
+    pass "F2 --with-pm2 exit 0"
+else
+    fail "F2 --with-pm2 exit ${RC} (log tail: $(tail -5 "$LOG_F2" | tr '\n' ' '))"
+fi
+
+SET_F2="${PROJ_F2}/.claude/settings.json"
+if [ -f "$SET_F2" ] && jq empty "$SET_F2" >/dev/null 2>&1; then
+    pass "F2 settings.json 유효 JSON"
+    CMDS_F2="$(settings_commands "$SET_F2")"
+    if printf '%s\n' "$CMDS_F2" | grep -q 'post-tool-failure\.sh'; then
+        pass "F2 PostToolUseFailure -> post-tool-failure.sh 배선"
+    else
+        fail "F2 post-tool-failure.sh 미배선"
+    fi
+    if printf '%s\n' "$CMDS_F2" | grep -q 'service-health-check\.sh'; then
+        pass "F2 Stop -> service-health-check.sh 배선"
+    else
+        fail "F2 service-health-check.sh 미배선"
+    fi
+    if jq -e '(.hooks.PostToolUseFailure | length) > 0' "$SET_F2" >/dev/null 2>&1; then
+        pass "F2 PostToolUseFailure 이벤트 배열 존재"
+    else
+        fail "F2 PostToolUseFailure 이벤트 배열 없음"
+    fi
+    if printf '%s\n' "$CMDS_F2" | grep -q 'stop-self-check\.sh'; then
+        fail "F2 --with-pm2 인데 verify-hooks 훅이 배선됨 (플래그 누수)"
+    else
+        pass "F2 verify-hooks 훅 미배선 (플래그 분리 유지)"
+    fi
+else
+    fail "F2 settings.json 없음 또는 파싱 불가: ${SET_F2}"
+fi
+
+HASH_F2_BEFORE="$(file_hash "$SET_F2")"
+BAKS_F2_BEFORE="$(count_baks_in "$HOME_F2" "$PROJ_F2")"
+LOG_F2B="${SANDBOX_ROOT}/run-f2b.log"
+HOME="$HOME_F2" bash "$INSTALL" --with-pm2 --project "$PROJ_F2" \
+    > "$LOG_F2B" 2>&1 < /dev/null
+RC=$?
+HASH_F2_AFTER="$(file_hash "$SET_F2")"
+BAKS_F2_AFTER="$(count_baks_in "$HOME_F2" "$PROJ_F2")"
+if [ "$RC" -eq 0 ]; then
+    pass "F2 재실행 exit 0"
+else
+    fail "F2 재실행 exit ${RC} (log tail: $(tail -5 "$LOG_F2B" | tr '\n' ' '))"
+fi
+if [ -n "$HASH_F2_BEFORE" ] && [ "$HASH_F2_BEFORE" = "$HASH_F2_AFTER" ]; then
+    pass "F2 재실행 settings.json 불변 (멱등)"
+else
+    fail "F2 재실행에 settings.json 변경됨 (before=${HASH_F2_BEFORE}, after=${HASH_F2_AFTER})"
+fi
+if [ "$BAKS_F2_AFTER" -eq "$BAKS_F2_BEFORE" ]; then
+    pass "F2 재실행 신규 .bak 0개 (before=${BAKS_F2_BEFORE}, after=${BAKS_F2_AFTER})"
+else
+    fail "F2 재실행에 신규 .bak 생성됨 (before=${BAKS_F2_BEFORE}, after=${BAKS_F2_AFTER})"
 fi
 
 # ============================================================================
