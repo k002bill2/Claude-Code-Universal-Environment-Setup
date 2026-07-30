@@ -97,6 +97,29 @@ else
     fail "A2 ~/.claude/skills ${SKILL_COUNT}개 (<19)"
 fi
 
+# A2b: 글로벌 docs 설치 — 정규화된 하위 디렉토리 + install.sh 사본 부재
+#   세 어서션은 한 묶음이다: 개수 검증 없이 "install.sh 사본 0개"만 보면
+#   docs 설치가 아예 안 돌아도 통과하는 공허한 검증이 된다 (검증의 검증).
+DOCS_ROOT="${SANDBOX_HOME}/.claude/docs/claude-code-setup"
+SYS_DOC_COUNT="$(find "${DOCS_ROOT}/system-setup" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+if [ "$SYS_DOC_COUNT" -ge 17 ]; then
+    pass "A2b ~/.claude/docs/claude-code-setup/system-setup ${SYS_DOC_COUNT}개 (>=17)"
+else
+    fail "A2b ~/.claude/docs/claude-code-setup/system-setup ${SYS_DOC_COUNT}개 (<17)"
+fi
+ADVISOR_DOC_COUNT="$(find "${DOCS_ROOT}/codex-advisor-worker-bundle" -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+if [ "$ADVISOR_DOC_COUNT" -ge 3 ]; then
+    pass "A2b ~/.claude/docs/claude-code-setup/codex-advisor-worker-bundle ${ADVISOR_DOC_COUNT}개 (>=3)"
+else
+    fail "A2b ~/.claude/docs/claude-code-setup/codex-advisor-worker-bundle ${ADVISOR_DOC_COUNT}개 (<3)"
+fi
+DOCS_INSTALLER_COPIES="$(find "$DOCS_ROOT" -type f -name 'install.sh' 2>/dev/null | wc -l | tr -d ' ')"
+if [ "$DOCS_INSTALLER_COPIES" -eq 0 ]; then
+    pass "A2b docs 설치 대상에 install.sh 사본 없음 (설치기 제외 계약)"
+else
+    fail "A2b docs 설치 대상에 install.sh 사본 ${DOCS_INSTALLER_COPIES}개: $(find "$DOCS_ROOT" -type f -name 'install.sh' | head -3 | tr '\n' ' ')"
+fi
+
 # A3: 프로젝트 .claude/agents — primary-coordinator.md 포함 6종 이상
 AGENTS_DIR="${SANDBOX_PROJECT}/.claude/agents"
 if [ -f "${AGENTS_DIR}/primary-coordinator.md" ]; then

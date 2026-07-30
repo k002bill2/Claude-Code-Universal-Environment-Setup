@@ -44,6 +44,8 @@ ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
 SAFETY_DOC_SRC="${SCRIPT_DIR}/docs/Claude code system setup/Parallel Agents Safety Protocol v3.1.0.md"
 FRAGMENTS_DIR="${SCRIPT_DIR}/project/settings-fragments"
 HOOKS_SRC_DIR="${SCRIPT_DIR}/project/hooks"
+DOCS_SRC_DIR="${SCRIPT_DIR}/docs"
+DOCS_DST_DIR="${CLAUDE_HOME}/docs/claude-code-setup"
 
 # 공용 병합 엔진
 # shellcheck source=lib/merge-settings.sh
@@ -356,8 +358,45 @@ resolve_project_dir() {
 }
 
 # ──────────────────────────────────────────────────────
-# Step 1: Global (~/.claude/rules, ~/.claude/skills) — 관리 파일 정책
+# Step 1: Global (~/.claude/rules, ~/.claude/skills, ~/.claude/docs) — 관리 파일 정책
 # ──────────────────────────────────────────────────────
+
+# docs/ 하위 디렉토리명 → 설치 대상 디렉토리명 정규화
+# (bash 3.2 호환: 연관배열 대신 case)
+normalize_docs_dirname() {
+    case "$1" in
+        "Claude code system setup") printf '%s' "system-setup" ;;
+        *)                          printf '%s' "$1" ;;
+    esac
+}
+
+# docs/ 하위의 모든 *.md 를 ~/.claude/docs/claude-code-setup/<정규화명>/ 에 설치.
+# *.md 만 대상으로 하므로 docs/*/install.sh 2종은 구조적으로 제외된다 — 의도된 제외다:
+#   (1) 설치기이지 문서가 아니고, (2) ~/.claude 아래 사본이 실행될 여지를 없애며,
+#   (3) 두 번들의 정본(SSOT)은 리포의 원본 install.sh 이므로 사본은 드리프트만 만든다.
+# 하위 경로는 그대로 보존한다(재귀). 디렉토리 생성은 install_managed_file 에 맡긴다
+# (여기서 mkdir 하면 --dry-run 쓰기 0건 계약이 깨진다).
+install_global_docs() {
+    local d name norm f rel
+    if [ ! -d "$DOCS_SRC_DIR" ]; then
+        log_warn "docs 소스 없음, 스킵: ${DOCS_SRC_DIR}"
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+        return 0
+    fi
+    for d in "${DOCS_SRC_DIR}/"*/; do
+        [ -d "$d" ] || continue
+        d="${d%/}"
+        name="$(basename "$d")"
+        norm="$(normalize_docs_dirname "$name")"
+        # 파이프 대신 프로세스 치환 — 파이프는 서브셸을 만들어 카운터가 유실된다.
+        while IFS= read -r -d '' f; do
+            rel="${f#${d}/}"
+            install_managed_file "$f" "${DOCS_DST_DIR}/${norm}/${rel}" \
+                "~/.claude/docs/claude-code-setup/${norm}/${rel}"
+        done < <(find "$d" -type f -name '*.md' -print0 2>/dev/null)
+    done
+}
+
 install_global() {
     log_info "글로벌 설치: ${CLAUDE_HOME}/"
     local f d name
@@ -371,6 +410,7 @@ install_global() {
         name="$(basename "$d")"
         install_managed_dir "$d" "${CLAUDE_HOME}/skills/${name}" "~/.claude/skills/${name}/"
     done
+    install_global_docs
     echo ""
 }
 
@@ -608,7 +648,7 @@ print_summary() {
     echo "  INSTALLED: ${INSTALLED_COUNT} | UNCHANGED: ${UNCHANGED_COUNT} | BACKED_UP: ${BACKED_UP_COUNT} | SKIPPED: ${SKIPPED_COUNT}"
     echo "  (위임 설치기 system-setup / advisor-worker 의 상세는 각자의 요약 출력 참조)"
     echo ""
-    echo "  Global: ~/.claude/rules/ + ~/.claude/skills/"
+    echo "  Global: ~/.claude/rules/ + ~/.claude/skills/ + ~/.claude/docs/claude-code-setup/"
     if [ -n "$PROJECT_DIR" ]; then
         echo "  Project: ${PROJECT_DIR}/.claude/"
     fi

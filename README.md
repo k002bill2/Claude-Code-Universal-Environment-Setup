@@ -55,8 +55,8 @@ cd Claude-Code-Universal-Environment-Setup
 ├── examples/                   # --with-examples 옵트인 스킬·에이전트
 ├── templates/pm2/              # --with-pm2 비파괴 템플릿
 ├── CLAUDE.md.template          # → CLAUDE.md (skip-if-exists)
-└── docs/
-    ├── Claude code system setup/       # 하위 install.sh = 이 번들의 정본(SSOT)
+└── docs/                       # *.md → ~/.claude/docs/claude-code-setup/ (글로벌, 관리 파일)
+    ├── Claude code system setup/       # 하위 install.sh = 이 번들의 정본(SSOT) → system-setup/
     └── codex-advisor-worker-bundle/    # 하위 install.sh = 이 번들의 정본(SSOT)
 ```
 
@@ -67,6 +67,7 @@ cd Claude-Code-Universal-Environment-Setup
 | docs 기능 | 설치 주체 |
 |-----------|----------|
 | 글로벌 rules/skills, 프로젝트 skills·agents·commands | 루트 직접 |
+| docs 가이드 문서 (`docs/**/*.md`, install.sh 제외) | 루트 직접 → `~/.claude/docs/claude-code-setup/` (글로벌, 관리 파일) |
 | settings.json 병합 (guardrails, cli-orchestration) | 루트 직접 (`lib/merge-settings.sh`) |
 | Parallel Agents Safety Protocol v3.1.0 | 루트 직접 → `<project>/docs/` (관리 파일) |
 | CLAUDE.md, skill-rules.json, .mcp.json.example, dev/ 골격, 메모리 시드 | 루트 직접 (skip-if-exists) |
