@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "skillName": "feature-planner",
+      "priority": "high",
+      "enforcement": "suggest",
+      "keywords": ["plan", "feature", "설계", "기능 계획", "브리프"]
+    },
+    {
+      "skillName": "verification-loop",
+      "priority": "high",
+      "enforcement": "suggest",
+      "keywords": ["verify", "verification", "검증", "빌드 확인", "테스트 통과"]
+    },
+    {
+      "skillName": "verify-implementation",
+      "priority": "medium",
+      "enforcement": "suggest",
+      "keywords": ["구현 확인", "implementation check", "완료 검증", "구현 끝"]
+    },
+    {
+      "skillName": "dev-docs",
+      "priority": "medium",
+      "enforcement": "suggest",
+      "keywords": ["dev docs", "대규모", "컨텍스트", "장기 작업"]
+    }
+  ]
+}

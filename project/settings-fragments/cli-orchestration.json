@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(git *)",
+      "Bash(docker *)"
+    ]
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Agent completed: $AGENT_NAME'"
+          }
+        ]
+      }
+    ]
+  }
+}
