@@ -10,6 +10,7 @@
 #   C. --dry-run → 샌드박스 쓰기 0건
 #   D. --global-only → 프로젝트 미변경
 #   E. 관리 디렉토리 교체 의미론 → 스테일 파일 제거 + 그 후 다시 멱등
+#   G. skillOverrides 안전망 → 유실 시 복원 / 살아 있으면 사용자 값 우선 / 멱등
 #
 # 격리:
 #   - HOME 을 mktemp 샌드박스로 오버라이드 (~/.claude, ~/.codex 격리)
@@ -599,6 +600,74 @@ if [ "$BAKS_F2_AFTER" -eq "$BAKS_F2_BEFORE" ]; then
     pass "F2 재실행 신규 .bak 0개 (before=${BAKS_F2_BEFORE}, after=${BAKS_F2_AFTER})"
 else
     fail "F2 재실행에 신규 .bak 생성됨 (before=${BAKS_F2_BEFORE}, after=${BAKS_F2_AFTER})"
+fi
+
+echo ""
+echo "=== Test G: skillOverrides 안전망 (글로벌 settings 조각) ==="
+
+# 기대값은 조각 파일에서 읽는다 — 개수를 하드코딩하면 조각이 갱신될 때마다 드리프트한다.
+FRAG_SO="${REPO_DIR}/global/settings-fragments/skill-overrides.json"
+EXPECTED_SO="$(jq -r '.skillOverrides | length' "$FRAG_SO" 2>/dev/null)"
+
+HOME_G="${SANDBOX_ROOT}/home-g"
+mkdir -p "$HOME_G"
+LOG_G="${SANDBOX_ROOT}/run-g.log"
+HOME="$HOME_G" bash "$INSTALL" --global-only > "$LOG_G" 2>&1 < /dev/null
+RC=$?
+if [ "$RC" -eq 0 ]; then
+    pass "G0 --global-only exit 0"
+else
+    fail "G0 --global-only exit ${RC} (log tail: $(tail -5 "$LOG_G" | tr '\n' ' '))"
+fi
+
+SET_G="${HOME_G}/.claude/settings.json"
+ACTUAL_SO="$(jq -r '.skillOverrides | length' "$SET_G" 2>/dev/null || echo 0)"
+if [ -n "$EXPECTED_SO" ] && [ "$ACTUAL_SO" = "$EXPECTED_SO" ]; then
+    pass "G0 skillOverrides ${ACTUAL_SO}개 설치됨"
+else
+    fail "G0 skillOverrides 개수 불일치 (기대=${EXPECTED_SO}, 실제=${ACTUAL_SO})"
+fi
+
+# ── G1: 안전망 발화 — 키가 통째로 사라진 상태에서 복원되는가 ──────────────
+# 설치 후 존재 확인(G0)만으로는 부족하다: 조각이 아예 동작하지 않아도 통과한다.
+# 유실 상태를 직접 만들어, 안전망이 실제로 발화하는지를 본다.
+jq 'del(.skillOverrides) | .model = "sentinel-model"' "$SET_G" > "${SET_G}.tmp" \
+    && mv "${SET_G}.tmp" "$SET_G"
+HOME="$HOME_G" bash "$INSTALL" --global-only > "$LOG_G" 2>&1 < /dev/null
+RC=$?
+RESTORED_SO="$(jq -r '.skillOverrides | length' "$SET_G" 2>/dev/null || echo 0)"
+if [ "$RC" -eq 0 ] && [ "$RESTORED_SO" = "$EXPECTED_SO" ]; then
+    pass "G1 유실 후 재실행에 skillOverrides ${RESTORED_SO}개 복원"
+else
+    fail "G1 복원 실패 (exit=${RC}, 복원=${RESTORED_SO}, 기대=${EXPECTED_SO})"
+fi
+if [ "$(jq -r '.model' "$SET_G" 2>/dev/null)" = "sentinel-model" ]; then
+    pass "G1 복원이 다른 최상위 키(model)를 건드리지 않음"
+else
+    fail "G1 복원이 기존 model 키를 덮어씀"
+fi
+
+# ── G2: 사용자 편집 우선 — 조각이 살아 있는 값을 덮어쓰지 않는가 ──────────
+jq '.skillOverrides = {"user-owned-skill":"off"}' "$SET_G" > "${SET_G}.tmp" \
+    && mv "${SET_G}.tmp" "$SET_G"
+HOME="$HOME_G" bash "$INSTALL" --global-only > "$LOG_G" 2>&1 < /dev/null
+RC=$?
+if [ "$RC" -eq 0 ] \
+   && [ "$(jq -rc '.skillOverrides' "$SET_G" 2>/dev/null)" = '{"user-owned-skill":"off"}' ]; then
+    pass "G2 기존 skillOverrides 값 우선 (사용자 편집 불변)"
+else
+    fail "G2 사용자 값이 덮어써짐: $(jq -rc '.skillOverrides' "$SET_G" 2>/dev/null)"
+fi
+
+# ── G3: 멱등 — 무변경 재실행에 신규 .bak 이 생기지 않는가 ─────────────────
+BAKS_G_BEFORE="$(count_baks_in "$HOME_G")"
+HOME="$HOME_G" bash "$INSTALL" --global-only > "$LOG_G" 2>&1 < /dev/null
+RC=$?
+BAKS_G_AFTER="$(count_baks_in "$HOME_G")"
+if [ "$RC" -eq 0 ] && [ "$BAKS_G_AFTER" -eq "$BAKS_G_BEFORE" ]; then
+    pass "G3 재실행 신규 .bak 0개 (before=${BAKS_G_BEFORE}, after=${BAKS_G_AFTER})"
+else
+    fail "G3 재실행에 신규 .bak 생성됨 (exit=${RC}, before=${BAKS_G_BEFORE}, after=${BAKS_G_AFTER})"
 fi
 
 # ============================================================================

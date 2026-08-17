@@ -43,6 +43,7 @@ SYSTEM_SETUP_INSTALLER="${SCRIPT_DIR}/docs/Claude code system setup/install.sh"
 ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
 SAFETY_DOC_SRC="${SCRIPT_DIR}/docs/Claude code system setup/Parallel Agents Safety Protocol v3.1.0.md"
 FRAGMENTS_DIR="${SCRIPT_DIR}/project/settings-fragments"
+GLOBAL_FRAGMENTS_DIR="${SCRIPT_DIR}/global/settings-fragments"
 HOOKS_SRC_DIR="${SCRIPT_DIR}/project/hooks"
 DOCS_SRC_DIR="${SCRIPT_DIR}/docs"
 DOCS_DST_DIR="${CLAUDE_HOME}/docs/claude-code-setup"
@@ -397,6 +398,35 @@ install_global_docs() {
     done
 }
 
+# ~/.claude/settings.json 조각 병합 — skillOverrides 안전망.
+#
+# skillOverrides 는 스킬 description 의 컨텍스트 주입을 끄는 유일한 스위치다
+# (2026-08-17 실측: 50개 항목이 약 15k 토큰의 주입을 차단하고 있었다). 그런데 이
+# 조각을 두기 전까지 어떤 스크립트도 그 값을 소유하지 않아, 글로벌 settings.json 이
+# 유실되면 복구 경로가 없고 토큰만 조용히 되돌아왔다 — 발화 신호가 없는 회귀다.
+#
+# 병합 계약(lib/merge-settings.sh)상 "기타 최상위 키 = 기존 값 우선"이므로:
+#   - skillOverrides 가 살아 있으면 이 조각은 무시된다(사용자가 나중에 더한 항목 보존)
+#   - **최상위 키 자체가 없을 때만** 스냅샷이 복원된다
+# 따라서 재실행은 멱등이고 사용자 편집과 충돌하지 않는다.
+#
+# 범위 한계: 판정은 키 존재 여부(has) 한 번이다. 항목 일부만 지워진 "부분 유실"은
+#   키가 남아 있으므로 복원되지 않는다. 이는 의도된 트레이드오프다 — 항목 단위로
+#   병합하면 사용자가 일부러 지운 override 가 설치할 때마다 되살아난다.
+#
+# 조각 갱신(설정을 바꿨으면 이 명령으로 스냅샷을 다시 내보낼 것):
+#   jq '{skillOverrides}' ~/.claude/settings.json \
+#     > global/settings-fragments/skill-overrides.json
+#
+# 주의 1: 조각에 model 키를 절대 넣지 않는다 (Step 2b 의 불변식과 동일).
+# 주의 2: 목록에 없는 스킬에 대한 override 는 무해하므로, 해당 스킬이 설치되지 않은
+#         머신에 복원돼도 문제되지 않는다.
+install_global_settings() {
+    merge_fragment_into "${CLAUDE_HOME}/settings.json" \
+        "${GLOBAL_FRAGMENTS_DIR}/skill-overrides.json" \
+        "~/.claude/settings.json <- skill-overrides.json"
+}
+
 install_global() {
     log_info "글로벌 설치: ${CLAUDE_HOME}/"
     local f d name
@@ -411,6 +441,7 @@ install_global() {
         install_managed_dir "$d" "${CLAUDE_HOME}/skills/${name}" "~/.claude/skills/${name}/"
     done
     install_global_docs
+    install_global_settings
     echo ""
 }
 
@@ -649,6 +680,7 @@ print_summary() {
     echo "  (위임 설치기 system-setup / advisor-worker 의 상세는 각자의 요약 출력 참조)"
     echo ""
     echo "  Global: ~/.claude/rules/ + ~/.claude/skills/ + ~/.claude/docs/claude-code-setup/"
+    echo "          + ~/.claude/settings.json (skillOverrides — 부재 시에만 복원)"
     if [ -n "$PROJECT_DIR" ]; then
         echo "  Project: ${PROJECT_DIR}/.claude/"
     fi
