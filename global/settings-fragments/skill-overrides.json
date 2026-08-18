@@ -49,6 +49,19 @@
     "supabase-postgres-best-practices": "off",
     "obsidian-vault": "off",
     "gstack-ship": "user-invocable-only",
-    "gstack-land-and-deploy": "user-invocable-only"
+    "gstack-land-and-deploy": "user-invocable-only",
+    "watch": "off",
+    "agent-improvement": "off",
+    "agent-observability": "off",
+    "gstack": "off",
+    "gstack-office-hours": "off",
+    "gstack-unfreeze": "off",
+    "hook-creator": "user-invocable-only",
+    "slash-command-creator": "user-invocable-only",
+    "find-skills": "user-invocable-only",
+    "computer-use": "user-invocable-only",
+    "external-memory": "user-invocable-only",
+    "cli-orchestration": "user-invocable-only",
+    "review": "user-invocable-only"
   }
 }
