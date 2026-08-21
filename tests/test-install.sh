@@ -96,8 +96,8 @@ else
     fail "A0 install.sh --full --project exit ${RC} (log tail: $(tail -5 "$LOG1" | tr '\n' ' '))"
 fi
 
-# A1: ~/.claude/rules 4종
-for r in golden-principles interaction security verification; do
+# A1: ~/.claude/rules 7종 (2026-08 live 역동기화 기준)
+for r in golden-principles interaction security verification coding-style date-calculation git-workflow; do
     if [ -f "${SANDBOX_HOME}/.claude/rules/${r}.md" ]; then
         pass "A1 ~/.claude/rules/${r}.md 존재"
     else
@@ -105,12 +105,14 @@ for r in golden-principles interaction security verification; do
     fi
 done
 
-# A2: ~/.claude/skills 19개 이상
+# A2: ~/.claude/skills — 기대 개수는 소스에서 읽는다 (하드코딩 드리프트 방지)
+#     (2026-08 정리: live 삭제 스킬 7종 + 심링크 소유 review 를 페이로드에서 제외)
+EXPECTED_SKILLS="$(find "${REPO_DIR}/global/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
 SKILL_COUNT="$(find "${SANDBOX_HOME}/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-if [ "$SKILL_COUNT" -ge 19 ]; then
-    pass "A2 ~/.claude/skills ${SKILL_COUNT}개 (>=19)"
+if [ "$EXPECTED_SKILLS" -ge 1 ] && [ "$SKILL_COUNT" -ge "$EXPECTED_SKILLS" ]; then
+    pass "A2 ~/.claude/skills ${SKILL_COUNT}개 (>=${EXPECTED_SKILLS})"
 else
-    fail "A2 ~/.claude/skills ${SKILL_COUNT}개 (<19)"
+    fail "A2 ~/.claude/skills ${SKILL_COUNT}개 (<${EXPECTED_SKILLS})"
 fi
 
 # A2b: 글로벌 docs 설치 — 정규화된 하위 디렉토리 + install.sh 사본 부재
@@ -387,10 +389,10 @@ fi
 #    영구 diff + 매 실행 .bak 이 된다. 교체 의미론이면 1회 실행으로 정리된다.)
 # ============================================================================
 echo "=== Test E: managed dir replacement removes stale files ==="
-STALE_SKILL_DIR="${SANDBOX_HOME}/.claude/skills/dev-docs"
+STALE_SKILL_DIR="${SANDBOX_HOME}/.claude/skills/cli-orchestration"
 STALE_FILE="${STALE_SKILL_DIR}/stale-removed.md"
 if [ -d "$STALE_SKILL_DIR" ]; then
-    pass "E0 관리 스킬 디렉토리 존재: ~/.claude/skills/dev-docs/"
+    pass "E0 관리 스킬 디렉토리 존재: ~/.claude/skills/cli-orchestration/"
 
     # 소유권 모델 전환(2026-08-21): 관리 디렉토리는 더 이상 rm -rf 통째 교체가
     # 아니라 manifest 기반 파일 단위 동기화다. 따라서 "제거 대상 스테일"은
@@ -399,7 +401,7 @@ if [ -d "$STALE_SKILL_DIR" ]; then
     # 아래 두 가지를 함께 심어 양쪽을 모두 검증한다.
     printf 'stale\n' > "$STALE_FILE"
     E_MANIFEST="${SANDBOX_HOME}/.claude/.manifest"
-    printf 'skills/dev-docs/stale-removed.md\t%s\n' \
+    printf 'skills/cli-orchestration/stale-removed.md\t%s\n' \
         "$(shasum -a 256 "$STALE_FILE" | awk '{print $1}')" >> "$E_MANIFEST"
     # 사용자가 직접 추가한 파일 — 제거되면 안 된다
     E_USER_FILE="${STALE_SKILL_DIR}/user-added.md"
@@ -421,13 +423,13 @@ if [ -d "$STALE_SKILL_DIR" ]; then
     fi
     # 검증의 검증: 디렉토리가 통째로 날아간 게 아니라 소스로 재구성되었는지
     if [ -f "${STALE_SKILL_DIR}/SKILL.md" ]; then
-        pass "E1 소스 파일 재설치됨 (dev-docs/SKILL.md 존재)"
+        pass "E1 소스 파일 재설치됨 (cli-orchestration/SKILL.md 존재)"
     else
-        fail "E1 dev-docs/SKILL.md 없음 — 교체가 디렉토리를 비우기만 함"
+        fail "E1 cli-orchestration/SKILL.md 없음 — 교체가 디렉토리를 비우기만 함"
     fi
     # 소유권 모델의 다른 한쪽: 사용자가 추가한 파일은 살아 있어야 한다
     if [ -f "$E_USER_FILE" ] && grep -q 'user added' "$E_USER_FILE"; then
-        pass "E1 사용자 추가 파일 보존됨 (dev-docs/user-added.md)"
+        pass "E1 사용자 추가 파일 보존됨 (cli-orchestration/user-added.md)"
     else
         fail "E1 사용자 추가 파일이 삭제됨: ${E_USER_FILE}"
     fi

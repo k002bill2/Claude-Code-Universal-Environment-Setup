@@ -87,20 +87,20 @@ echo "=== L6: managed-dir stale owned removed / user files preserved ==="
 HOME="${SANDBOX_ROOT}/home6" bash "${REPO_DIR}/install.sh" --global-only >/dev/null 2>&1
 SKILLS_DIR="${SANDBOX_ROOT}/home6/.claude/skills"
 MANIFEST6="${SANDBOX_ROOT}/home6/.claude/.manifest"
-OWNED_SKILL="${SKILLS_DIR}/dev-docs/SKILL.md"
+OWNED_SKILL="${SKILLS_DIR}/cli-orchestration/SKILL.md"
 
 # 검증의 검증: 관리 디렉터리가 실제로 채워졌는지 먼저 확인한다.
 # (디렉터리가 비어 있으면 아래 보존/삭제 주장이 전부 헛돈다)
 if [ -f "$OWNED_SKILL" ] && [ -f "$MANIFEST6" ]; then
-    pass "L6-0 관리 스킬 디렉터리가 실제로 설치됨 (dev-docs/SKILL.md)"
+    pass "L6-0 관리 스킬 디렉터리가 실제로 설치됨 (cli-orchestration/SKILL.md)"
 
-    STALE6="${SKILLS_DIR}/dev-docs/stale-file.md"
-    USERADD6="${SKILLS_DIR}/dev-docs/my-notes.md"
-    USERMOD6="${SKILLS_DIR}/dev-docs/SKILL.md"
+    STALE6="${SKILLS_DIR}/cli-orchestration/stale-file.md"
+    USERADD6="${SKILLS_DIR}/cli-orchestration/my-notes.md"
+    USERMOD6="${SKILLS_DIR}/cli-orchestration/SKILL.md"
 
     # (1) installer 소유 stale: 실제 해시로 manifest 에 기록 → 제거 대상
     printf 'owned stale content\n' > "$STALE6"
-    printf 'skills/dev-docs/stale-file.md\t%s\n' "$(file_hash "$STALE6")" >> "$MANIFEST6"
+    printf 'skills/cli-orchestration/stale-file.md\t%s\n' "$(file_hash "$STALE6")" >> "$MANIFEST6"
     # (2) 사용자가 추가한 파일 (manifest 미기록) → 보존 대상
     printf 'my own notes\n' > "$USERADD6"
     # (3) installer 소유였으나 사용자가 수정한 파일 → 보존 대상
@@ -109,21 +109,21 @@ if [ -f "$OWNED_SKILL" ] && [ -f "$MANIFEST6" ]; then
     HOME="${SANDBOX_ROOT}/home6" bash "${REPO_DIR}/install.sh" --global-only >/dev/null 2>&1
 
     if [ ! -e "$STALE6" ]; then
-        pass "L6-1 stale owned 파일 제거됨 (dev-docs/stale-file.md)"
+        pass "L6-1 stale owned 파일 제거됨 (cli-orchestration/stale-file.md)"
     else
         fail "L6-1 stale owned 파일이 잔존함: ${STALE6}"
     fi
     if [ -f "$USERADD6" ] && grep -q 'my own notes' "$USERADD6"; then
-        pass "L6-2 사용자 추가 파일 보존됨 (dev-docs/my-notes.md)"
+        pass "L6-2 사용자 추가 파일 보존됨 (cli-orchestration/my-notes.md)"
     else
         fail "L6-2 사용자 추가 파일이 삭제됨: ${USERADD6}"
     fi
     if grep -q 'L6 USER EDIT' "$USERMOD6"; then
-        pass "L6-3 사용자 수정 파일 보존됨 (dev-docs/SKILL.md)"
+        pass "L6-3 사용자 수정 파일 보존됨 (cli-orchestration/SKILL.md)"
     else
         fail "L6-3 사용자 수정 파일이 덮어써짐: ${USERMOD6}"
     fi
-    if ! grep -q 'skills/dev-docs/stale-file.md' "$MANIFEST6"; then
+    if ! grep -q 'skills/cli-orchestration/stale-file.md' "$MANIFEST6"; then
         pass "L6-4 manifest 에서 stale 항목 제거됨"
     else
         fail "L6-4 manifest 에 stale 항목이 남음"
@@ -155,7 +155,7 @@ else
 fi
 
 OWNED_RULE="${HOME7}/.claude/rules/golden-principles.md"
-OWNED_SKILL7="${HOME7}/.claude/skills/dev-docs/SKILL.md"
+OWNED_SKILL7="${HOME7}/.claude/skills/cli-orchestration/SKILL.md"
 OWNED_AGENT="$(find "${PROJ7}/.claude/agents" -name '*.md' -type f 2>/dev/null | head -1)"
 SET7="${PROJ7}/.claude/settings.json"
 
@@ -163,7 +163,7 @@ if [ -f "$OWNED_RULE" ] && [ -f "$OWNED_SKILL7" ] && [ -n "$OWNED_AGENT" ] && [ 
     pass "L7-1 설치 산출물 존재 (제거 대상이 실재함 — 테스트 헛돎 방지)"
 
     # 사용자 자산 심기
-    USER_ADD7="${HOME7}/.claude/skills/dev-docs/keep-me.md"
+    USER_ADD7="${HOME7}/.claude/skills/cli-orchestration/keep-me.md"
     printf 'keep me\n' > "$USER_ADD7"
     USER_MOD7="${HOME7}/.claude/rules/security.md"
     printf '\nL7 USER EDIT\n' >> "$USER_MOD7"
@@ -569,7 +569,7 @@ else
 fi
 
 # uninstall 이 실제로 소유 파일을 지우는지
-L10_USER="${H10}/.claude/skills/dev-docs/user-keep.md"
+L10_USER="${H10}/.claude/skills/cli-orchestration/user-keep.md"
 printf 'user keeps this\n' > "$L10_USER"
 L10_OWNED="${H10}/.claude/rules/golden-principles.md"
 HOME="$H10" bash "${FIX10}/install.sh" --uninstall --project "$P10" \
@@ -668,7 +668,7 @@ if [ -f "$SKILL11" ] && [ -f "$RULE11" ] && [ -f "$AGENT11" ]; then
         fail "L11-6 사용자 추가 파일이 삭제됨: ${USERADD11}"
     fi
     # 아직 소스에 있는 자산은 건드리면 안 된다
-    if [ -f "${H11}/.claude/skills/dev-docs/SKILL.md" ] && \
+    if [ -f "${H11}/.claude/skills/cli-orchestration/SKILL.md" ] && \
        [ -f "${H11}/.claude/rules/security.md" ]; then
         pass "L11-7 소스에 남아 있는 자산은 그대로 유지됨"
     else

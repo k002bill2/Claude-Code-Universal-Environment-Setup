@@ -125,7 +125,7 @@ packages/shared → packages/ui → packages/app (의존성 순서)
 # 위임 패턴
 Task(subagent_type="cli-worker", prompt="...", run_in_background=true)
 Task(subagent_type="test-automation-specialist", prompt="...")
-Task(subagent_type="performance-optimizer", prompt="...")
+Task(subagent_type="general-purpose", prompt="...")
 
 # 결과 집계
 각 에이전트 결과를 TaskOutput으로 수집 → 통합 리포트
@@ -135,7 +135,7 @@ Task(subagent_type="performance-optimizer", prompt="...")
 |----------|---------|
 | 단순/병렬 CLI | `cli-worker` (Haiku) |
 | 테스트 | `test-automation-specialist` |
-| 성능 분석 | `performance-optimizer` |
+| 성능 분석 | `general-purpose` |
 | 백엔드 | `backend-integration-specialist` |
 | UI | `web-ui-specialist` |
 
@@ -157,3 +157,9 @@ Task(subagent_type="performance-optimizer", prompt="...")
 | PreToolUse(Bash) | `pre-bash-check.sh` | CLI 세션 추적 |
 | PostToolUse(Bash) | `post-bash-collect.sh` | 결과 수집 |
 | Stop | `session-cleanup.sh` | 세션 정리 |
+
+## 사용하지 말아야 할 때
+
+- 단일 명령 또는 2-3개의 순차 Bash 호출로 끝나는 작업은 이 스킬 없이 직접 실행하라.
+- 명시적인 다중 명령 동시 실행, 모노레포 전체 작업, DAG 파이프라인 맥락에서만 이 스킬을 사용한다.
+- 의존성이 없는 단순 작업까지 오케스트레이션으로 감싸면 오히려 오버헤드만 늘어난다.
