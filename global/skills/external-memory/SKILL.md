@@ -8,21 +8,21 @@ user-invocable: false
 
 ## Purpose
 
-Enable long-running multi-agent tasks to persist context beyond token limits, supporting:
-- Research plan preservation
-- Intermediate findings storage
-- Checkpoint-based recovery
-- Context snapshots for fresh agent handoffs
+장기 실행 다중 에이전트 태스크가 토큰 한계를 넘어 컨텍스트를 유지하도록 지원:
+- 리서치 플랜 보존
+- 중간 결과 저장
+- 체크포인트 기반 복구
+- 새 에이전트 핸드오프용 컨텍스트 스냅샷
 
 ## Directory Structure
 
 ```
 .temp/memory/
 ├── research_plans/         # Active research strategies
-│   └── {task_id}.md        # Current approach and goals
+│   └── {task_id}.md
 ├── findings/               # Subagent results
-│   ├── {agent}_{ts}.md     # Individual findings
-│   └── merged_{ts}.md      # Synthesized results
+│   ├── {agent}_{ts}.md
+│   └── merged_{ts}.md
 ├── checkpoints/            # Recovery points
 │   └── cp_{phase}_{ts}.json
 └── context_snapshots/      # Token limit saves
@@ -32,194 +32,68 @@ Enable long-running multi-agent tasks to persist context beyond token limits, su
 ## When to Use
 
 ### Automatic Triggers
-1. **Token Threshold (150K)**: Save before running out of context
-2. **Phase Transition**: After completing exploration/planning/implementation
-3. **Agent Completion**: When subagent returns significant findings
-4. **Before Spawning**: Before large parallel agent batch
+1. **Context Budget Trigger** — 조언자 컨텍스트 예산 훅(`advisor-context-budget.js`)이
+   CONTEXT BUDGET WARNING/CRITICAL 을 주입하면 저장한다. 고정 토큰 수(구 "150K")가 아니라
+   세션 베이스라인 대비 델타 기준이다. 상세: docs/codex-advisor-worker-bundle/REVIEW_컨텍스트예산-리서치격리.md
+2. **Phase Transition** — exploration/planning/implementation 완료 후
+3. **Agent Completion** — 의미 있는 findings 반환 시
+4. **Before Spawning** — 큰 병렬 batch 직전
 
 ### Manual Triggers
-- User requests "save progress"
-- Complex decision point reached
-- Uncertainty about next steps
+- 사용자가 "save progress" 요청
+- 복잡한 결정 지점 도달
+- 다음 단계 불확실
 
-## Memory Types
+## Memory Types (요약)
 
-### 1. Research Plans
-**Purpose**: Preserve strategic direction across context limits
+| 타입 | 용도 | 위치 |
+|------|------|------|
+| Research Plan | 전략 방향 보존 | `research_plans/{task_id}.md` |
+| Findings | subagent 결과 캡처 | `findings/{agent}_{ts}.md` |
+| Checkpoint | 실패 복구 지점 | `checkpoints/cp_{phase}_{ts}.json` |
+| Context Snapshot | 전체 컨텍스트 save | `context_snapshots/snap_{ts}.md` |
 
-```markdown
-# Research Plan: {task_id}
-
-## Objective
-{What we're trying to accomplish}
-
-## Strategy
-{High-level approach}
-
-## Key Questions
-- [ ] Question 1
-- [x] Question 2 (answered)
-
-## Progress
-- Completed: {list}
-- In Progress: {list}
-- Pending: {list}
-
-## Constraints
-- {constraint_1}
-- {constraint_2}
-
-## Next Actions
-1. {action_1}
-2. {action_2}
-```
-
-### 2. Findings
-**Purpose**: Capture subagent discoveries for synthesis
-
-```markdown
-# Findings: {agent_name}
-**Task**: {task_description}
-**Timestamp**: {ISO timestamp}
-**Status**: completed|partial|failed
-
-## Summary
-{2-3 sentence summary}
-
-## Key Discoveries
-1. {discovery_1}
-2. {discovery_2}
-
-## Files Modified/Created
-- `path/to/file.ts` - {description}
-
-## Open Questions
-- {question_1}
-
-## Recommendations
-- {recommendation_1}
-```
-
-### 3. Checkpoints
-**Purpose**: Enable recovery from failures
-
-```json
-{
-  "checkpoint_id": "cp_implementation_20250104T120000",
-  "task_id": "feature_xyz",
-  "phase": "implementation",
-  "timestamp": "2025-01-04T12:00:00Z",
-  "state": {
-    "completed_subtasks": ["task_1", "task_2"],
-    "pending_subtasks": ["task_3", "task_4"],
-    "active_agents": ["web-ui-specialist"],
-    "blocked_agents": [],
-    "findings_count": 3
-  },
-  "context_summary": "Implementing agent detail feature. UI components done, backend integration in progress.",
-  "next_action": "Wait for backend-integration-specialist to complete API service",
-  "recovery_instructions": "Resume by checking workspace metadata for pending agents"
-}
-```
-
-### 4. Context Snapshots
-**Purpose**: Full context save before token limit
-
-```markdown
-# Context Snapshot
-**Timestamp**: {ISO timestamp}
-**Token Count**: ~{estimated_count}
-**Reason**: {token_limit|manual|phase_end}
-
-## Conversation Summary
-{Key points from conversation so far}
-
-## Current State
-- Task: {current_task}
-- Phase: {exploration|planning|implementation|review}
-- Agents: {active_agents}
-
-## Important Context
-{Critical information that must not be lost}
-
-## Files in Play
-- `file_1.ts` - {status}
-- `file_2.ts` - {status}
-
-## Pending Decisions
-- {decision_1}
-
-## Resume Instructions
-{How to continue from this point}
-```
+각 타입의 정확한 파일 포맷: [references/memory-schemas.md](references/memory-schemas.md)
 
 ## Operations
 
-### Save Research Plan
 ```bash
-# Create/update research plan
+# Save research plan
 .temp/memory/research_plans/{task_id}.md
-```
 
-### Save Findings
-```bash
-# After subagent completion
+# Save findings (subagent 완료 후)
 .temp/memory/findings/{agent}_{timestamp}.md
 
 # Merge multiple findings
 .temp/memory/findings/merged_{timestamp}.md
-```
 
-### Create Checkpoint
-```bash
-# At phase boundaries
+# Create checkpoint (phase 경계)
 .temp/memory/checkpoints/cp_{phase}_{timestamp}.json
-```
 
-### Save Context Snapshot
-```bash
-# Before token limit or handoff
+# Context snapshot (토큰 한계/핸드오프 직전)
 .temp/memory/context_snapshots/snap_{timestamp}.md
 ```
 
-### Load for Recovery
-1. Check latest checkpoint: `ls -t .temp/memory/checkpoints/`
-2. Read checkpoint JSON
-3. Load relevant findings
-4. Resume from `next_action`
+### Recovery 시 (Load)
+
+1. 최신 checkpoint 확인: `ls -t .temp/memory/checkpoints/`
+2. checkpoint JSON 읽기
+3. 관련 findings 로드
+4. `next_action`부터 재개
 
 ## Best Practices
 
-### 1. Save Early, Save Often
-- Don't wait until 150K tokens
-- Save after each significant discovery
-- Checkpoint at every phase transition
-
-### 2. Write Actionable Summaries
-- Include "what" and "why"
-- List concrete next steps
-- Reference specific files and line numbers
-
-### 3. Keep Findings Focused
-- One finding per significant discovery
-- Don't dump entire conversations
-- Extract key insights only
-
-### 4. Structure for Retrieval
-- Use consistent naming conventions
-- Include timestamps for ordering
-- Tag with task_id for filtering
-
-### 5. Clean Up Old Memory
-- Archive completed task memory
-- Delete stale checkpoints (>24h)
-- Consolidate related findings
+1. **Save Early, Save Often** — 150K 도달 전, 발견마다, phase 전환마다
+2. **Actionable Summaries** — what + why + 다음 단계 + 파일:line 참조
+3. **Focused Findings** — 의미 있는 발견 1개씩, 대화 전체 덤프 금지
+4. **Retrieval Structure** — 일관 네이밍, 타임스탬프, task_id 태그
+5. **Cleanup** — 완료 태스크 아카이브, 24h 이상 stale checkpoint 삭제
 
 ## Integration with Orchestrator
 
-The Lead Orchestrator should:
+Lead Orchestrator 책임:
 
-1. **Initialize Memory** at task start
+1. **Initialize Memory** (태스크 시작)
    ```
    Create: .temp/memory/research_plans/{task_id}.md
    ```
@@ -247,18 +121,18 @@ The Lead Orchestrator should:
 
 ## Token Estimation
 
-Rough estimates for planning:
 - 1 word ≈ 1.3 tokens
 - 1 line of code ≈ 10 tokens
 - 1 file read ≈ 500-2000 tokens
 - 1 agent response ≈ 1000-3000 tokens
 
-**Warning Zone**: 120K tokens (80% of 150K)
-**Save Zone**: 150K tokens (trigger snapshot)
+| Zone | 토큰 | 행동 |
+|------|------|------|
+| Warning | 120K (80%) | 다음 자연스러운 지점에서 저장 |
+| Save | 150K | 즉시 snapshot |
 
-## Example Usage
+## Example Usage Flow
 
-### Starting a Complex Task
 ```markdown
 1. Create research plan
    └── .temp/memory/research_plans/agent_feature.md
@@ -281,4 +155,4 @@ Rough estimates for planning:
 
 ---
 
-**Version**: 1.0 | **Last Updated**: 2025-01-04
+**Version**: 1.1 (Skills 2.0 migration)

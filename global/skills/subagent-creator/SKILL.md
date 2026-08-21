@@ -11,6 +11,7 @@ Create specialized AI sub-agents for Claude Code that handle specific tasks with
 
 Sub-agents are Markdown files with YAML frontmatter stored in:
 - **Project**: `.claude/agents/` (highest priority)
+- **CLI `--agents` flag**: JSON object (medium priority)
 - **User**: `~/.claude/agents/` (lowest priority)
 
 ### Structure
@@ -21,7 +22,7 @@ name: subagent-name
 description: When to use this subagent (include "use proactively" for auto-delegation)
 tools: Tool1, Tool2, Tool3  # Optional - inherits all if omitted
 model: sonnet               # Optional - sonnet/opus/haiku/inherit
-permissionMode: default     # Optional
+permissionMode: default     # Optional - default/acceptEdits/bypassPermissions/plan/ignore
 skills: skill1, skill2      # Optional - auto-load skills
 ---
 
@@ -33,36 +34,128 @@ System prompt goes here. Define role, responsibilities, and behavior.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | Lowercase with hyphens |
-| `description` | Yes | Purpose and when to use |
-| `tools` | No | Comma-separated tool list |
+| `description` | Yes | Purpose and when to use (key for auto-delegation) |
+| `tools` | No | Comma-separated tool list (omit to inherit all) |
 | `model` | No | `sonnet`, `opus`, `haiku`, or `inherit` |
 | `permissionMode` | No | `default`, `acceptEdits`, `bypassPermissions`, `plan`, `ignore` |
-| `skills` | No | Comma-separated skill names |
+| `skills` | No | Comma-separated skill names to auto-load |
+
+### Permission Modes
+
+| Mode | Description |
+|------|-------------|
+| `default` | Normal permission prompts |
+| `acceptEdits` | Auto-accept Edit/Write, prompt for others |
+| `bypassPermissions` | Skip all permission prompts |
+| `plan` | Read-only mode, requires plan approval |
+| `ignore` | Ignore permission requests entirely |
+
+### Skills Auto-loading
+
+The `skills` field loads specified skills into the subagent's context automatically:
+
+```yaml
+skills: react-web-development, test-automation
+```
+
+This gives the subagent domain knowledge without explicitly including it in the system prompt.
 
 ## Creation Workflow
 
-1. **Gather requirements**: Ask about the sub-agent's purpose
-2. **Choose scope**: Project or user level
+1. **Gather requirements**: Ask about the sub-agent's purpose, when to use it, and required capabilities
+2. **Choose scope**: Project (`.claude/agents/`) or user (`~/.claude/agents/`)
 3. **Define configuration**: Name, description, tools, model
-4. **Write system prompt**: Clear role, responsibilities, output format
-5. **Create file**: Write the `.md` file
+4. **Write system prompt**: Clear role, responsibilities, and output format
+5. **Create file**: Write the `.md` file to the appropriate location
 
 ## Writing Effective Sub-agents
 
 ### Description Best Practices
 
+The `description` field is critical for automatic delegation:
+
 ```yaml
 # Good - specific triggers
 description: Expert code reviewer. Use PROACTIVELY after writing or modifying code.
+
+# Good - clear use cases
+description: Debugging specialist for errors, test failures, and unexpected behavior.
 
 # Bad - too vague
 description: Helps with code
 ```
 
+> **AOS 주의:** AOS에서는 specialist형 에이전트(web-ui-specialist, backend-integration-specialist 등)가 Tool API 대신 XML 태그를 텍스트로 출력하는 문제가 관측되어, 가능하면 general-purpose subagent_type을 우선 사용하라(검증된 안정성).
+
 ### System Prompt Guidelines
 
-1. Define role clearly: "You are a [specific expert role]"
-2. List actions on invocation
-3. Specify responsibilities
-4. Include constraints and best practices
-5. Define output format
+1. **Define role clearly**: "You are a [specific expert role]"
+2. **List actions on invocation**: What to do first
+3. **Specify responsibilities**: What the sub-agent handles
+4. **Include guidelines**: Constraints and best practices
+5. **Define output format**: How to structure responses
+
+### Tool Selection
+
+- **Read-only tasks**: `Read, Grep, Glob, Bash`
+- **Code modification**: `Read, Write, Edit, Grep, Glob, Bash`
+- **Full access**: Omit `tools` field
+
+See [references/available-tools.md](references/available-tools.md) for complete tool list.
+
+## Built-in Sub-agents
+
+Claude Code includes 3 built-in sub-agents. See [references/built-in-agents.md](references/built-in-agents.md).
+
+## Advanced Usage
+
+See [references/advanced-usage.md](references/advanced-usage.md) for:
+- CLI `--agents` flag for dynamic configuration
+- Resume-based agent continuation
+- Agent chaining patterns
+
+## Example Sub-agents
+
+See [references/examples.md](references/examples.md) for complete examples:
+- Code Reviewer
+- Debugger
+- Data Scientist
+- Test Runner
+- Documentation Writer
+- Security Auditor
+
+## Template
+
+Copy from [assets/subagent-template.md](assets/subagent-template.md) to start a new sub-agent.
+
+## Quick Start Example
+
+Create a code reviewer sub-agent:
+
+```bash
+mkdir -p .claude/agents
+```
+
+Write to `.claude/agents/code-reviewer.md`:
+
+```markdown
+---
+name: code-reviewer
+description: Reviews code for quality and security. Use proactively after code changes.
+tools: Read, Grep, Glob, Bash
+model: inherit
+---
+
+You are a senior code reviewer.
+
+When invoked:
+1. Run git diff to see changes
+2. Review modified files
+3. Report issues by priority
+
+Focus on:
+- Code readability
+- Security vulnerabilities
+- Error handling
+- Best practices
+```

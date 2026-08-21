@@ -1,0 +1,160 @@
+# CLI Orchestration Workflow Template
+# 위치: ~/.claude/cli-orchestration/workflows/
+# 사용법: /run-workflow <name>
+
+name: my-workflow
+version: 1.0.0
+description: 워크플로우 설명
+
+# ========================================
+# ACE Layer 1: 윤리적 제약
+# ========================================
+ethical_constraints:
+  - 테스트 통과 없이 배포 금지
+  - 치명적 실패 시 롤백
+  - 민감한 정보 노출 방지
+
+# ========================================
+# 설정
+# ========================================
+settings:
+  max_parallel: 4              # 최대 동시 실행 수
+  fail_fast: false             # 첫 실패 시 전체 중단 여부
+  timeout_default: 300s        # 기본 타임아웃
+  retry_default: 2             # 기본 재시도 횟수
+  checkpoint_after: []         # 체크포인트 저장 태스크
+  working_directory: .         # 기본 작업 디렉토리
+
+# ========================================
+# 환경 변수
+# ========================================
+env:
+  NODE_ENV: production
+  CI: true
+
+# ========================================
+# ACE Layer 4: 작업 분해
+# ========================================
+tasks:
+  # ----------------------------------------
+  # 예시 1: 기본 태스크
+  # ----------------------------------------
+  - id: install
+    name: Install Dependencies
+    command: npm ci
+    working_directory: $PROJECT_ROOT
+    timeout: 300s
+    retry: 2
+    on_failure: abort
+
+  # ----------------------------------------
+  # 예시 2: 병렬 그룹
+  # ----------------------------------------
+  - id: lint
+    name: Run Linter
+    command: npm run lint
+    parallel_group: validation    # 같은 그룹은 병렬 실행
+    depends_on: [install]
+    timeout: 120s
+
+  - id: typecheck
+    name: Type Check
+    command: npm run typecheck
+    parallel_group: validation    # lint와 병렬 실행
+    depends_on: [install]
+    timeout: 120s
+
+  # ----------------------------------------
+  # 예시 3: 조건부 실행
+  # ----------------------------------------
+  - id: test
+    name: Run Tests
+    command: npm test
+    depends_on: [lint, typecheck]
+    condition: "lint.success AND typecheck.success"
+    timeout: 300s
+    retry: 2
+    env:
+      CI: true
+
+  # ----------------------------------------
+  # 예시 4: 빌드
+  # ----------------------------------------
+  - id: build
+    name: Build Application
+    command: npm run build
+    depends_on: [test]
+    timeout: 600s
+    artifacts:
+      - dist/
+      - .next/
+
+  # ----------------------------------------
+  # 예시 5: 승인 필요
+  # ----------------------------------------
+  - id: deploy
+    name: Deploy to Production
+    command: npm run deploy
+    depends_on: [build]
+    requires_approval: true       # 사용자 승인 대기
+    timeout: 300s
+    on_failure: rollback
+
+# ========================================
+# 에러 처리 전략
+# ========================================
+error_strategies:
+  retry:
+    max_attempts: 3
+    backoff: exponential
+    initial_delay: 1s
+    max_delay: 30s
+
+  fallback:
+    - task: build
+      fallback_command: npm run build:fallback
+
+  rollback:
+    - task: deploy
+      rollback_steps:
+        - git revert HEAD
+        - npm run deploy:rollback
+
+# ========================================
+# 알림
+# ========================================
+notifications:
+  on_success:
+    - type: console
+      message: "워크플로우 완료: $WORKFLOW_NAME"
+
+  on_failure:
+    - type: console
+      message: "워크플로우 실패: $WORKFLOW_NAME at $FAILED_TASK"
+
+# ========================================
+# 에이전트 위임 (선택)
+# ========================================
+agent_delegation:
+  enabled: false
+
+  # 특정 태스크를 전문 에이전트에게 위임
+  mappings:
+    - task_pattern: "test*"
+      agent: test-automation-specialist
+    - task_pattern: "build*"
+      agent: cli-worker
+    - task_pattern: "deploy*"
+      agent: cli-worker
+
+# ========================================
+# 메타데이터
+# ========================================
+metadata:
+  author: your-name
+  created_at: 2025-01-31
+  updated_at: 2025-01-31
+  tags:
+    - ci
+    - build
+    - deploy

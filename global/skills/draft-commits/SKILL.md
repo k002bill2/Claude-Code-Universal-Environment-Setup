@@ -39,6 +39,15 @@ git log --oneline -5
 | `.claude/commands/` | Claude Commands | docs(commands) |
 | `.claude/agents/` | Claude Agents | docs(agents) |
 | `.claude/*.json` | Claude Config | chore(config) |
+| `src/backend/api/` | Backend API | feat(api) |
+| `src/backend/services/` | Backend Services | feat(services) |
+| `src/backend/agents/` | Backend Agents | feat(agents) |
+| `src/backend/models/` | Backend Models | feat(models) |
+| `src/backend/db/` | Backend Database | feat(db) |
+| `src/dashboard/src/pages/` | Dashboard Pages | feat(pages) |
+| `src/dashboard/src/components/` | Dashboard Components | feat(components) |
+| `src/dashboard/src/stores/` | Dashboard Stores | feat(stores) |
+| `src/dashboard/src/hooks/` | Dashboard Hooks | feat(hooks) |
 | `tests/` | Tests | test |
 | `docs/` | Documentation | docs |
 | `infra/` | Infrastructure | chore(infra) |

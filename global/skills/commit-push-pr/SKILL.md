@@ -33,9 +33,13 @@ Conventional Commits 형식으로 커밋 메시지를 생성하세요:
 - `test:` 테스트 추가/수정
 - `chore:` 빌드, 설정 변경
 
-### 4. 커밋 및 푸시
+### 4. 스테이징 · 커밋 · 푸시
+
+먼저 `git status`로 변경 파일을 확인하고 **명시적으로** 스테이징하세요:
+
 ```bash
-git add .
+git status                    # 변경 파일 확인
+git add <변경한_파일들>       # 명시적 스테이징 (git add . 금지)
 git commit -m "커밋메시지"
 git push origin HEAD
 ```
@@ -44,6 +48,9 @@ git push origin HEAD
 ```bash
 git push -u origin HEAD
 ```
+
+> ⚠️ **`git add .` 금지** — 다중 세션 환경에서 다른 작업의 변경/untracked 파일까지
+> 스테이징해 surgical commit을 깨뜨립니다. 항상 변경한 파일만 명시적으로 add 하세요.
 
 ### 5. PR 생성
 GitHub CLI를 사용하여 PR을 생성하세요:
@@ -69,6 +76,13 @@ EOF
 - 커밋 전 `/verify-app` 실행 권장
 - 민감한 정보 (API 키, 비밀번호) 포함 여부 확인
 - 브랜치 이름은 `feature/`, `fix/`, `refactor/` 접두사 사용
+- 머지 후 ghost-merge 검증 필수 (GitHub가 권위 소스, 모든 머지 방식 안전):
+  ```bash
+  gh pr view <PR> --json state,baseRefName,mergedAt
+  # state == "MERGED" && baseRefName == 대상브랜치 && mergedAt != null → 안착 확정
+  ```
+  ⚠️ `git cherry` / `git merge-base --is-ancestor` 는 **squash 머지에서 false negative**다
+  (squash 커밋은 PR-head를 히스토리에 포함하지 않아 ancestor가 아님) → ghost-merge 검증에 사용 금지.
 
 ## 예시 실행
 ```
