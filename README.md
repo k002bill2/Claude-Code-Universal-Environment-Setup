@@ -87,10 +87,22 @@ cd Claude-Code-Universal-Environment-Setup
 설치(특히 재설치) 전에 반드시 스냅샷을 라이브 기준으로 갱신하라:
 
 ```bash
-scripts/sync-from-live.sh              # rules / skills / skillOverrides 동기화 + CLAUDE.md 블록 드리프트 보고
-scripts/sync-from-live.sh --write-claude-block   # advisor heredoc 블록까지 갱신
+scripts/sync-from-live.sh              # rules / skills / skillOverrides 동기화 + heredoc 블록 3종 드리프트 보고
+scripts/sync-from-live.sh --write-blocks   # heredoc 블록 3종까지 갱신 (재설치 전 권장)
 git diff                               # 검토 후 커밋 → install.sh
 ```
+
+heredoc 블록 3종(스플라이스는 구조를 깨뜨릴 수 있어 기본은 **보고만** 한다):
+
+| 블록 | 라이브 원본 | 개별 플래그 |
+|---|---|---|
+| CLAUDE.md 마커 블록 | `~/.claude/CLAUDE.md` | `--write-claude-block` |
+| 훅 JS (`ADVCTXJS`) | `~/.claude/hooks/advisor-context-budget.js` | `--write-hook-blocks` |
+| statusline 브리지 (`CTXBRIDGE`) | 활성 statusline 의 `ctx-budget` 마커 블록 | `--write-hook-blocks` |
+
+`--write-blocks` 는 위 두 플래그를 모두 켠다. **재설치 전에는 이쪽을 쓰라** —
+`--write-claude-block` 만 쓰면 훅·브리지가 낡은 채 남아 `install.sh` 가 라이브 모니터를
+구버전으로 롤백시킨다(2026-08-21 실제 발생: 훅이 두 세대 앞선 상태로 방치돼 있었다).
 
 라이브에서 삭제된 스킬·심볼릭링크 스킬은 자동 처리하지 않고 경고만 출력한다
 (파괴적 결정은 사람이 한다). 페이로드에서 스킬을 제거하면 이후 업그레이드에서
