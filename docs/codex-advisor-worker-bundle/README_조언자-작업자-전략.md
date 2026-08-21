@@ -107,10 +107,16 @@ Claude Code 안에서 Codex로 코드 리뷰·작업 위임을 하는 공식 플
   WebSearch·WebFetch·tavily·context7 을 직접 부르지 않고 `researcher` 에게 위임해 **결론+출처 요약만** 받는다.
   서브에이전트가 이 도구들을 갖는 것은 모순이 아니다 — 컨텍스트가 분리되기 때문이다.
   (하드 차단은 불가능하다. `permissions.deny` 는 서브에이전트의 도구까지 함께 죽인다 → 규칙 기반 소프트 강제)
-- **컨텍스트 예산 (조언자 세션):** 세션 시작 시점 대비 **+59k 토큰**을 쓰면 새 작업을 시작하지 않는다
-  (베이스라인 50,905 기준 200k 창 사용률로는 약 55% 시점).
+- **컨텍스트 예산 (조언자 세션):** 세션 시작 시점 대비 **델타**가 임계를 넘으면 새 작업을 시작하지 않는다.
+  기준은 델타(토큰)이되 임계치는 **창 크기에 비례**하며, 비율은 **창 티어별로 다르다**(2026-08-08):
+  소형 창(< 500k)은 WARNING 15% / CRITICAL 20% (200k 창 = +30k / +40k),
+  대형 창(>= 500k)은 WARNING 40% / CRITICAL 55% (1M 창 = +400k / +550k).
+  창 크기를 모를 때(브리지 `window` 부재)는 200k 로 폴백해 소형 티어를 적용한다 — 모르면 보수적으로.
   `CONTEXT BUDGET WARNING`/`CONTEXT BUDGET CRITICAL` 이 주입되면 ① 진행 중 작업 마무리 → ② 상태 저장
-  (`.planning/STATE.md` 있으면 `/gsd:pause-work` 제안, 없으면 HANDOFF.md 작성. 코드가 더러우면 `/wip-save` 병행)
+  (분기 조건은 STATE.md 가 아니라 **미완료 plan 의 실존**이다 — `.planning/phases/<phase>/` 에 대응
+  `*-SUMMARY.md` 없는 `*-PLAN.md` 가 있으면 `/gsd:pause-work` 제안, 아니면(전부 완료 포함)
+  `.planning/STATE.md` 가 있으면 그 `Current Position`·`Session Continuity` 갱신, 둘 다 없으면
+  HANDOFF.md 작성. 코드가 더러우면 `/wip-save` 병행)
   → ③ **새 세션 권고**(compact 보다 우선 — 무엇을 남길지 조언자가 직접 고를 수 있다).
   저장 포맷을 새로 만들지 않는다. 경고는 예산 소진(세션 시작 대비 델타)과 컨텍스트 창 사용률을
   **함께** 표시한다 — 둘은 다른 지표이고, 창에 여유가 있어도 예산을 넘으면 정지 대상이다.
@@ -150,12 +156,19 @@ bash install.sh                                        # 번들 폴더 안에서
 (기존 퍼미션·실행 비트 보존). 이 블록은 세션 첫 관측치를 baseline 으로 래치하고 **사실값만**
 `$TMPDIR/claude-ctx-advisor-{session_id}.json` 에 기록한다 —
 `{baseline, current, delta, window, window_pct, timestamp}`. 합성 퍼센트는 쓰지 않는다.
-`~/.claude/hooks/advisor-context-budget.js`(PostToolUse) 가 그 `delta` 를 직접 보고
-**51,133** 에서 `CONTEXT BUDGET WARNING`, **59,000** 에서 `CONTEXT BUDGET CRITICAL` 을 주입한다.
+`~/.claude/hooks/advisor-context-budget.js`(PostToolUse) 가 그 `delta` 와 `window` 를 직접 보고
+`CONTEXT BUDGET WARNING`/`CONTEXT BUDGET CRITICAL` 을 주입한다. 임계는 **창 크기에 비례**하고
+비율은 **창 티어별로 다르다**: 소형 창(< 500k) `window×15%` / `window×20%`(200k 창 = +30k / +40k),
+대형 창(>= 500k) `window×40%` / `window×55%`(1M 창 = +400k / +550k).
+`window` 가 없거나 정상 범위(1만~1천만) 밖이면 200k 로 폴백해 소형 티어를 적용한다 — 모르면 보수적으로.
 
-- **왜 퍼센트가 아니라 델타인가:** 베이스라인(시스템 프롬프트+CLAUDE.md+스킬+도구 스키마)만으로
+- **왜 창 사용률이 아니라 델타인가:** 베이스라인(시스템 프롬프트+CLAUDE.md+스킬+도구 스키마)만으로
   이미 200k 창의 ~25% 를 쓴다. "창의 25%" 임계치는 첫 턴부터 참이 되어 무한 발동한다.
-  델타 기준은 **창 크기와 무관**하게(200k든 1M이든) 같은 시점에 걸린다.
+  델타는 0 에서 시작하므로 그 "턴 0 발동" 함정이 없다.
+  **측정 기준(델타)과 임계 크기(창 비례)는 다른 축이다** — 무엇을 재는지는 델타로 고정하되,
+  얼마나 쓰면 멈출지는 창에 비례시킨다. 초판은 임계도 고정(51,133/59,000)이었으나 그 값은
+  200k 창에서 역산한 것이라 1M 창에서 창의 6% 지점에 울렸다 — 정상 작업 하나가 경고를
+  여러 번 띄우면 규칙이 사문화된다(2026-08-08 창 비례로 교체).
 - **왜 번들이 훅을 소유하는가:** 이전 배선은 합성 잔량을 GSD 플러그인 소유
   `gsd-context-monitor.js` 에 태웠다. 플러그인 업데이트로 임계치·스키마가 바뀌면 조용히 깨지고(R1),
   주입문의 `Usage at X%` 가 창 사용률이 아니라 예산 소진율이라 상태줄과 어긋나 보였다(R3).

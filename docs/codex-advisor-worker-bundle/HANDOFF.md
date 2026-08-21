@@ -58,10 +58,19 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 
 ## 설계 요약 (상세는 REVIEW 문서)
 
-- 임계치 = **베이스라인 델타 59k** (퍼센트 아님 — 실측 baseline 50,905 = 200k 창의 25.5%라 퍼센트는 양쪽 끝에서 깨짐). 59k 는 사용자 지정 "200k 창 사용률 50~55%" 에서 역산한 값 = `200,000 × 0.55 − 50,905`
+- 임계치 = **베이스라인 델타** (창 사용률 퍼센트가 아님 — 실측 baseline 50,905 = 200k 창의 25.5%라 창 퍼센트 임계는 양쪽 끝에서 깨짐).
+  - **[현행 · 2026-08-08]** 델타 기준은 유지하되 임계 크기를 **창에 비례**시키고 비율을 **창 티어로 분리**했다:
+    소형 창(< 500k) `window*15%` WARNING / `window*20%` CRITICAL, 대형 창(>= 500k) `window*40%` / `window*55%`.
+    대형 완화 근거: Opus 5 는 1M 전 구간에서 지시 준수·도구 호출을 유지하므로 15/20% 를 그대로 쓰면
+    델타 200k 에서 정지해 남은 800k 를 못 쓴다. 반대로 40/55% 를 200k 창에 적용하면 베이스라인 포함
+    창의 80% 까지 진행돼 `Context 75% Rule` 을 넘는다 → 티어 분리.
+  - **[구 — 이력]** 고정 상수 `51133`/`59000`. 사용자 지정 "200k 창 사용률 50~55%" 에서 역산한 값
+    (`200,000 × 0.55 − 50,905`)이라 **200k 창 전용**이었고, 1M 창에서는 창의 6% 지점에 울려
+    정상 작업 하나가 경고를 여러 번 띄웠다(규칙 사문화 위험) → 창 비례로 대체.
 - **[현행]** 배선 = `awesome-statusline.sh` 마커 블록 → `$TMPDIR/claude-ctx-advisor-{sid}.json`(사실만 기록:
   `baseline/current/delta/window/window_pct`) → **번들 소유 훅** `~/.claude/hooks/advisor-context-budget.js`
-  (settings.json `hooks.PostToolUse` 에 등록). 임계는 훅이 직접 판정: `delta>=51133` WARNING / `delta>=59000` CRITICAL.
+  (settings.json `hooks.PostToolUse` 에 등록). 임계는 훅이 `delta` 와 `window` 로 직접 판정한다
+  (창 티어별 비율 — 위 "임계치" 항목 참조. `window` 부재/이상 시 200k 폴백 → 소형 티어).
   디바운스 5회 + 승격 시 즉시 발화는 훅이 자체 구현(구 GSD 훅에서 공짜로 받던 것)
 - **[폐기됨 — 이력]** 구 배선은 `claude-ctx-{sid}.json` 에 `remaining_percentage = 100 - delta*100/78666` 를
   **합성**해 GSD 플러그인 훅에 태웠다. 그 기교(`78666 = floor(59000/0.75)`, 정수 나눗셈 경계 보정)는
