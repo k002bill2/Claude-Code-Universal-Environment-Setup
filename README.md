@@ -100,6 +100,7 @@ cd Claude-Code-Universal-Environment-Setup
    - **백업**: 관리 *파일* 갱신 시에만 `.bak`(`.bak.1`, ...) — bounded retention(기본 3개).
      관리 *디렉토리*는 디렉토리 단위 백업을 만들지 않습니다. 덮어쓰는 대상이
      "installer가 쓴 뒤 아무도 안 건드린 파일"뿐이라 백업할 사용자 내용이 없기 때문입니다.
+     retention은 **installer가 만든 백업만** 지웁니다 — 아래 *백업 소유 색인* 참조.
    - **상태**: UNCHANGED / BACKED_UP / INSTALLED / SKIPPED
 
 2. **사용자 소유 파일** (CLAUDE.md, skill-rules.json, .mcp.json.example, 메모리 시드): 존재하면 절대 건드리지 않음(SKIPPED) — skip-if-exists.
@@ -139,6 +140,31 @@ installer 소유물). 한 글자라도 다르면 사용자 편집으로 보고 �
 > 보존된 파일을 가리키는 문장이 `CLAUDE.md`(사용자 소유라 덮어쓰지 않음)에 남아 있을 수 있으니
 > 함께 정리하세요.
 
+## 백업 소유 색인 (`.manifest-backups` / `.settings-backups`)
+
+installer가 만든 백업만 정리하기 위해 **소유 색인 2종**을 남깁니다.
+이름(`<파일>.bak.N`)만 보고 지우면, 사용자가 같은 이름으로 만들어 둔 파일까지
+지워집니다. 그래서 우리가 만든 백업의 **경로와 그 시점 내용 해시**를 기록하고,
+지울 때 해시가 여전히 일치하는 것만 지웁니다.
+
+| 색인 | 위치 | 대상 |
+|------|------|------|
+| `.manifest-backups` | `~/.claude/` · `<project>/` (각 `.manifest` 옆) | 관리 파일의 `.bak*` |
+| `.settings-backups` | `~/.claude/` · `<project>/.claude/` (각 `settings.json` 옆) | `settings.json`의 `.bak*` |
+
+- **형식**: TSV 한 줄 = `백업 절대경로<TAB>기록 시점 해시`
+- **삭제 조건**: 색인에 있고 **현재 내용 해시가 기록과 일치**할 때만 정리 대상입니다.
+  경로가 재사용되었으면(내용이 다르면) 사용자 파일로 보고 건드리지 않습니다.
+- **fail-closed**: 색인을 읽거나 만들 수 없으면 **아무것도 지우지 않습니다**.
+  "전부 우리 것"으로 되돌아가는 폴백은 두지 않습니다.
+- **제거 시**: `*.bak`과 마찬가지로 `--uninstall` 이후에도 **남습니다**(복구 수단의
+  근거를 제거가 지우지 않기 위해서). 완전히 비우려면 백업과 함께 직접 삭제하세요:
+
+  ```bash
+  rm -f ~/.claude/.manifest-backups ~/.claude/.settings-backups
+  rm -f <project>/.manifest-backups <project>/.claude/.settings-backups
+  ```
+
 ## Uninstall Policy (`--uninstall`)
 
 설치 정책의 정확한 역연산입니다. **사용자 것은 절대 지우지 않습니다.**
@@ -148,7 +174,8 @@ installer 소유물). 한 글자라도 다르면 사용자 편집으로 보고 �
 - **settings.json**: `.settings-manifest`가 기록한 hooks/permissions identity만 제거합니다.
   사용자 훅·사용자 `allow`·알 수 없는 최상위 키는 불변입니다.
 - **디렉토리**: 제거 결과로 비게 된 것만 정리합니다.
-- **백업**: `*.bak`은 남깁니다 — 복구 수단을 제거가 지우면 안 됩니다.
+- **백업**: `*.bak`과 백업 소유 색인(`.manifest-backups` / `.settings-backups`)은
+  남깁니다 — 복구 수단과 그 소유 근거를 제거가 지우면 안 됩니다.
 - **위임 설치기**(system-setup / advisor 번들) 산출물은 이 manifest 밖이므로 제거 대상이 아닙니다.
 - 재실행은 멱등입니다.
 
