@@ -32,6 +32,7 @@ cd Claude-Code-Universal-Environment-Setup
 | `--with-examples` | `examples/` 스킬·에이전트를 프로젝트 `.claude/`에 추가 설치 |
 | `--with-pm2` | PM2 템플릿을 `<project>/docs/templates/pm2/`에 복사 + pm2-hooks 조각을 `settings.json`에 병합 |
 | `--with-verify-hooks` | verify-hooks 조각을 `.claude/settings.json`에 실제 병합 |
+| `--uninstall` | installer가 소유한 파일과 settings hooks/permissions만 제거 (아래 *Uninstall Policy*) |
 | `-h` / `--help` | 사용법 출력 |
 
 ## Directory Structure
@@ -60,7 +61,7 @@ cd Claude-Code-Universal-Environment-Setup
     └── codex-advisor-worker-bundle/    # 하위 install.sh = 이 번들의 정본(SSOT)
 ```
 
-`docs/` 하위 두 번들은 각자의 `install.sh`가 정본(SSOT)입니다. 루트 `install.sh`는 이들을 재구현하지 않고 **위임 호출**합니다. 실행 순서가 충돌 해소 수단입니다: 루트가 `.claude/settings.json`을 먼저 생성/병합하므로, 이후 위임되는 system-setup은 settings.json이 이미 존재해 `model` 키 주입이 구조적으로 발생하지 않습니다.
+`docs/` 하위 두 번들은 각자의 `install.sh`가 정본(SSOT)입니다. 루트 `install.sh`는 이들을 재구현하지 않고 **위임 호출**합니다. 루트는 `settings.json`의 hooks/permissions만 병합하고 `model` 필드는 주입하지 않습니다 — 모델 ID는 사용자가 직접 설정해야 하므로 시스템이 강제하지 않습니다.
 
 ## Feature Matrix — docs 문서 → 설치 주체
 
@@ -83,11 +84,118 @@ cd Claude-Code-Universal-Environment-Setup
 
 세 부류로 나뉩니다:
 
-1. **관리 파일** (rules, skills, agents, commands, Safety Protocol 등): 내용 동일 시 스킵(UNCHANGED), 변경 시 `.bak`(`.bak.1`, ...) 백업 후 갱신(BACKED_UP).
+1. **관리 파일 · 관리 디렉토리** (rules, skills, agents, commands, Safety Protocol 등)
+
+   디렉토리도 **파일 단위**로 동기화합니다. 디렉토리를 `rm -rf`로 통째 교체하지 않습니다.
+   소유권은 `~/.claude/.manifest` / `<project>/.manifest`(TSV: `상대경로<TAB>설치 시점 해시`)로 판정합니다.
+
+   | 상태 | 판정 | 동작 |
+   |------|------|------|
+   | installer 소유·미변경 | 기록 해시 == 현재 해시 | 갱신 / stale이면 삭제 |
+   | 이주(adopt) | manifest에 없지만 내용이 소스와 동일 | 소유권 인수 후 UNCHANGED |
+   | 사용자 추가 | manifest에 없고 내용도 다름 | **보존** |
+   | 사용자 수정 | 기록 해시 ≠ 현재 해시 | **보존** |
+
+   - **stale 정리**: 소스에서 사라진 파일은 *installer 소유·미변경*일 때만 제거합니다.
+   - **백업**: 관리 *파일* 갱신 시에만 `.bak`(`.bak.1`, ...) — bounded retention(기본 3개).
+     관리 *디렉토리*는 디렉토리 단위 백업을 만들지 않습니다. 덮어쓰는 대상이
+     "installer가 쓴 뒤 아무도 안 건드린 파일"뿐이라 백업할 사용자 내용이 없기 때문입니다.
+     retention은 **installer가 만든 백업만** 지웁니다 — 아래 *백업 소유 색인* 참조.
+   - **상태**: UNCHANGED / BACKED_UP / INSTALLED / SKIPPED
+
 2. **사용자 소유 파일** (CLAUDE.md, skill-rules.json, .mcp.json.example, 메모리 시드): 존재하면 절대 건드리지 않음(SKIPPED) — skip-if-exists.
-3. **병합 파일** (`.claude/settings.json`): 덮어쓰지 않고 병합 — hooks는 이벤트 단위 append(동일 command 존재 시 미추가), `permissions.allow`는 합집합, 기타 키는 기존 값 우선. `model` 키는 절대 넣지 않습니다.
+
+3. **병합 파일** (`.claude/settings.json`): 덮어쓰지 않고 병합
+   - hooks: 이벤트 단위 append (동일 command 존재 시 미추가, 멱등)
+   - permissions.allow: 합집합
+   - 기타 키: 기존 값 우선
+   - model 필드: 절대 주입 안함 (settings.json에서 사용자가 명시적으로 설정)
+   - 소유권은 `settings.json` 옆의 `.settings-manifest`에 `(event, matcher, command)` identity로 기록됩니다.
 
 요약에 `INSTALLED · UNCHANGED · BACKED_UP · SKIPPED` 카운트를 출력합니다.
+
+### 업스트림에서 제거된 자산 (stale sweep)
+
+관리 디렉토리 안의 stale 정리만으로는 **디렉토리째 사라진 스킬**이나 **삭제된 rules/agents 파일**을
+잡지 못합니다(그 디렉토리가 애초에 열거되지 않으므로). 그래서 설치 마지막에 manifest를 루트 단위로
+훑어, **그 자산을 만든 소스가 더 이상 없는** 항목을 정리합니다.
+
+- 삭제 조건은 다른 곳과 동일합니다 — manifest 기록 해시 == 현재 해시(installer 소유·미변경).
+  사용자가 수정한 파일은 보존하고 경고만 남깁니다.
+- 판정 기준은 "이번 실행에서 건드렸는가"가 **아니라 소스 존재 여부**입니다. 전자로 하면
+  `--with-examples` 없이 재실행했을 때 이전에 설치한 examples 자산이 지워집니다 — 사용자가 이번에
+  요청하지 않았을 뿐 업스트림에는 그대로 있는데도요.
+- 관리 접두(`rules/`, `skills/`, `docs/claude-code-setup/`, `.claude/{skills,agents,commands,hooks,settings-fragments}/`,
+  `docs/templates/pm2/`) 밖의 항목은 아예 대상이 아닙니다 — 위임 설치기와 사용자 파일을 보호합니다.
+
+### 레거시 `.claude/MODELS.md`
+
+이전 버전의 system-setup 설치기는 `.claude/MODELS.md`를 설치했습니다. 지금은 만들지 않으며,
+**이미 깔린 사본은 내용 해시가 과거 배포본과 일치할 때만 자동 삭제**합니다(= 사용자가 손대지 않은
+installer 소유물). 한 글자라도 다르면 사용자 편집으로 보고 삭제하지 않고, 설치 후 체크리스트에
+`[LEGACY-MODELS-KEPT]` 안내와 함께 수동 삭제를 요청합니다.
+
+> 자동 삭제하지 않는 이유: 그 파일은 낡은 모델 ID·CLI 버전을 "SSOT"라고 주장하므로 방치하면
+> 해롭지만, 사용자가 자기 내용을 덧붙였을 수 있어 무조건 지우면 데이터 손실입니다.
+> 보존된 파일을 가리키는 문장이 `CLAUDE.md`(사용자 소유라 덮어쓰지 않음)에 남아 있을 수 있으니
+> 함께 정리하세요.
+
+## 백업 소유 색인 (`.manifest-backups` / `.settings-backups`)
+
+installer가 만든 백업만 정리하기 위해 **소유 색인 2종**을 남깁니다.
+이름(`<파일>.bak.N`)만 보고 지우면, 사용자가 같은 이름으로 만들어 둔 파일까지
+지워집니다. 그래서 우리가 만든 백업의 **경로와 그 시점 내용 해시**를 기록하고,
+지울 때 해시가 여전히 일치하는 것만 지웁니다.
+
+| 색인 | 위치 | 대상 |
+|------|------|------|
+| `.manifest-backups` | `~/.claude/` · `<project>/` (각 `.manifest` 옆) | 관리 파일의 `.bak*` |
+| `.settings-backups` | `~/.claude/` · `<project>/.claude/` (각 `settings.json` 옆) | `settings.json`의 `.bak*` |
+
+- **형식**: TSV 한 줄 = `백업 절대경로<TAB>기록 시점 해시`
+- **삭제 조건**: 색인에 있고 **현재 내용 해시가 기록과 일치**할 때만 정리 대상입니다.
+  경로가 재사용되었으면(내용이 다르면) 사용자 파일로 보고 건드리지 않습니다.
+- **fail-closed**: 색인을 읽거나 만들 수 없으면 **아무것도 지우지 않습니다**.
+  "전부 우리 것"으로 되돌아가는 폴백은 두지 않습니다.
+- **제거 시**: `*.bak`과 마찬가지로 `--uninstall` 이후에도 **남습니다**(복구 수단의
+  근거를 제거가 지우지 않기 위해서). 완전히 비우려면 백업과 함께 직접 삭제하세요:
+
+  ```bash
+  rm -f ~/.claude/.manifest-backups ~/.claude/.settings-backups
+  rm -f <project>/.manifest-backups <project>/.claude/.settings-backups
+  ```
+
+## Uninstall Policy (`--uninstall`)
+
+설치 정책의 정확한 역연산입니다. **사용자 것은 절대 지우지 않습니다.**
+
+- **파일**: manifest 기록 해시 == 현재 해시일 때만 제거. 사용자가 수정했거나 manifest에
+  없는 파일(사용자 추가, `CLAUDE.md` 등 skip-if-exists 자산)은 그대로 둡니다.
+- **settings.json**: `.settings-manifest`가 기록한 hooks/permissions identity만 제거합니다.
+  사용자 훅·사용자 `allow`·알 수 없는 최상위 키는 불변입니다.
+- **디렉토리**: 제거 결과로 비게 된 것만 정리합니다.
+- **백업**: `*.bak`과 백업 소유 색인(`.manifest-backups` / `.settings-backups`)은
+  남깁니다 — 복구 수단과 그 소유 근거를 제거가 지우면 안 됩니다.
+- **위임 설치기**(system-setup / advisor 번들) 산출물은 이 manifest 밖이므로 제거 대상이 아닙니다.
+- 재실행은 멱등입니다.
+
+```bash
+./install.sh --uninstall                      # 글로벌만
+./install.sh --uninstall --project ./my-app   # 글로벌 + 프로젝트
+./install.sh --uninstall --dry-run            # 미리보기
+```
+
+## Failure Rollback (원자성)
+
+설치 도중 실패하거나 `Ctrl-C`(INT)/TERM이 들어오면 **이번 실행이 바꾼 모든 파일·settings·manifest를
+실행 전 상태로 되돌리고** 부분 설치를 남기지 않습니다.
+
+- 어떤 경로를 이번 실행에서 처음 건드리기 직전에 그 시점 상태(내용 사본 또는 "없었음")를
+  저널에 기록하고, 실패 시 역순으로 복원합니다.
+- 트리거는 EXIT 트랩 + 완료 센티널입니다. ERR 트랩만으로는 위임 단계의 `exit 1`을 잡지 못하고,
+  시그널 트랩만으로는 `set -e` 실패를 잡지 못하기 때문입니다.
+- **범위 밖**: 위임 설치기(system-setup / advisor 번들)가 쓴 파일은 저널에 없으므로 롤백되지
+  않습니다. 두 번들은 각자의 백업 정책을 따릅니다.
 
 **멱등성 계약**: 같은 명령의 2회차 실행은 변경 0건이어야 합니다. 병합 엔진은 신규 생성 시에도 병합 경로와 동일한 직렬화로 정규화해 이 계약을 보장합니다.
 

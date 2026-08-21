@@ -21,7 +21,7 @@ your-project/
 
 ---
 
-> ✅ **권장(원샷) 설치**: 최소 생존 셋업(`.claude/` 커맨드·훅·`settings.json`·`skill-rules.json`·`MODELS.md`)은 같은 폴더의 **`./install.sh <target-project-dir>`** 한 번으로 설치됩니다(멱등, 기존 `settings.json` 은 이벤트 단위로 딥머지). 아래의 STEP 1–8 수동 절차는 **동등한 대안**으로, 각 파일을 직접 이해·수정하고 싶을 때 사용하세요.
+> ✅ **권장(원샷) 설치**: 최소 생존 셋업(`.claude/` 커맨드·훅·`settings.json`·`skill-rules.json`)은 같은 폴더의 **`./install.sh <target-project-dir>`** 한 번으로 설치됩니다(멱등, 기존 `settings.json` 은 이벤트 단위로 딥머지). 아래의 STEP 1–8 수동 절차는 **동등한 대안**으로, 각 파일을 직접 이해·수정하고 싶을 때 사용하세요.
 
 ## 🚀 Claude Code에 입력할 프롬프트
 
@@ -64,8 +64,8 @@ your-project/
 **근거**: 프로토콜 Appendix A6 + Skills 활성화 + Dev Docs hooks
 **내용 요구사항**:
 - permissions.allow / deny 섹션 (Appendix A6 기준)
-- model: "claude-sonnet-5"
 - maxTokens: 16000
+- `model` 키는 넣지 않는다 — 모델 선택은 사용자/CLI(`/model`)의 몫이다
 
 hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 이벤트):
 

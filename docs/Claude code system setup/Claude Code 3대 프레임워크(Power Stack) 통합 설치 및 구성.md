@@ -16,7 +16,7 @@ tags:
 
 이 가이드는 Claude Code가 **기획(Gstack) ➡️ 컨텍스트 관리(GSD) ➡️ TDD 개발(Superpowers) ➡️ 최종 검증(Gstack)** 의 흐름으로 작업하도록 활용하는 방법을 설명합니다.
 
-> ✅ **기본 `.claude` 셋업은 원샷 설치**: 이 워크플로우가 기대는 최소 `.claude/` 스캐폴딩(커맨드·훅·`settings.json`·`MODELS.md`)은 같은 폴더의 **`./install.sh <target-project-dir>`** 한 번으로 설치됩니다(멱등). 아래 수동 절차는 동등한 대안입니다. 단 **GSD(`gsd:*`)·Gstack(`gstack-*`) 스킬 팩은 install.sh 범위 밖**(별도 서드파티 설치)이라는 점에 유의하세요 — 위 경고 참조.
+> ✅ **기본 `.claude` 셋업은 원샷 설치**: 이 워크플로우가 기대는 최소 `.claude/` 스캐폴딩(커맨드·훅·`settings.json`)은 같은 폴더의 **`./install.sh <target-project-dir>`** 한 번으로 설치됩니다(멱등). 아래 수동 절차는 동등한 대안입니다. 단 **GSD(`gsd:*`)·Gstack(`gstack-*`) 스킬 팩은 install.sh 범위 밖**(별도 서드파티 설치)이라는 점에 유의하세요 — 위 경고 참조.
 
 ---
 

@@ -58,9 +58,24 @@ SANDBOX_PROJECT="${SANDBOX_ROOT}/project"
 mkdir -p "$SANDBOX_HOME" "$SANDBOX_PROJECT"
 
 # ── 스냅샷: 파일 내용 해시 목록 (멱등성 = 내용 diff 0) ────────────────
+# shasum 을 직접 부르고 오류를 삼키면 그 도구가 없는 환경에서 스냅샷이 비어
+# 멱등 비교가 무조건 통과한다. 이식 가능한 해시 체인을 쓴다.
+ti_file_hash() {
+    local h=""
+    if command -v shasum >/dev/null 2>&1; then h="$(shasum -a 256 "$1" 2>/dev/null | awk '{print $1}')"; fi
+    if [ -z "$h" ] && command -v sha256sum >/dev/null 2>&1; then h="$(sha256sum "$1" 2>/dev/null | awk '{print $1}')"; fi
+    if [ -z "$h" ] && command -v cksum >/dev/null 2>&1; then h="$(cksum "$1" 2>/dev/null | awk '{print $1 "-" $2}')"; fi
+    [ -n "$h" ] || h="HASH-UNAVAILABLE"
+    printf '%s' "$h"
+}
+
 snapshot() {
     # $1 = 루트 디렉토리. 정렬된 "해시  ./상대경로" 목록을 stdout 으로.
-    ( cd "$1" && find . -type f -exec shasum -a 256 {} + 2>/dev/null | sort -k2 )
+    ( cd "$1" 2>/dev/null || return 0
+      find . -type f -print 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          printf '%s  %s\n' "$(ti_file_hash "$f")" "$f"
+      done )
 }
 
 count_baks() {
@@ -377,7 +392,19 @@ STALE_FILE="${STALE_SKILL_DIR}/stale-removed.md"
 if [ -d "$STALE_SKILL_DIR" ]; then
     pass "E0 관리 스킬 디렉토리 존재: ~/.claude/skills/dev-docs/"
 
+    # 소유권 모델 전환(2026-08-21): 관리 디렉토리는 더 이상 rm -rf 통째 교체가
+    # 아니라 manifest 기반 파일 단위 동기화다. 따라서 "제거 대상 스테일"은
+    # installer 가 설치한 뒤 아무도 안 건드린 파일(= manifest 기록 해시와 현재
+    # 해시가 같은 파일)로 한정된다. 사용자가 직접 넣은 파일은 보존이 정답이므로
+    # 아래 두 가지를 함께 심어 양쪽을 모두 검증한다.
     printf 'stale\n' > "$STALE_FILE"
+    E_MANIFEST="${SANDBOX_HOME}/.claude/.manifest"
+    printf 'skills/dev-docs/stale-removed.md\t%s\n' \
+        "$(shasum -a 256 "$STALE_FILE" | awk '{print $1}')" >> "$E_MANIFEST"
+    # 사용자가 직접 추가한 파일 — 제거되면 안 된다
+    E_USER_FILE="${STALE_SKILL_DIR}/user-added.md"
+    printf 'user added\n' > "$E_USER_FILE"
+
     LOG5="${SANDBOX_ROOT}/run5.log"
     HOME="$SANDBOX_HOME" bash "$INSTALL" --full --project "$SANDBOX_PROJECT" \
         > "$LOG5" 2>&1 < /dev/null
@@ -397,6 +424,12 @@ if [ -d "$STALE_SKILL_DIR" ]; then
         pass "E1 소스 파일 재설치됨 (dev-docs/SKILL.md 존재)"
     else
         fail "E1 dev-docs/SKILL.md 없음 — 교체가 디렉토리를 비우기만 함"
+    fi
+    # 소유권 모델의 다른 한쪽: 사용자가 추가한 파일은 살아 있어야 한다
+    if [ -f "$E_USER_FILE" ] && grep -q 'user added' "$E_USER_FILE"; then
+        pass "E1 사용자 추가 파일 보존됨 (dev-docs/user-added.md)"
+    else
+        fail "E1 사용자 추가 파일이 삭제됨: ${E_USER_FILE}"
     fi
 
     # E2: 스테일 정리 직후 상태를 기준으로 다시 멱등이어야 한다
@@ -497,11 +530,11 @@ if [ -f "$SET_F1" ] && jq empty "$SET_F1" >/dev/null 2>&1; then
     else
         fail "F1 PostToolUse matcher \"Edit|Write\" 없음"
     fi
-    # 기존 tsc/lint 항목이 보존되는지 (조각 확장이 기존 배선을 지우지 않았는지)
-    if printf '%s\n' "$CMDS_F1" | grep -q 'npx tsc --noEmit'; then
-        pass "F1 기존 verify-hooks 항목(npx tsc --noEmit) 보존"
+    # build-checker.sh 항목이 보존되는지 (조각 확장이 기존 배선을 지우지 않았는지)
+    if printf '%s\n' "$CMDS_F1" | grep -q 'build-checker\.sh'; then
+        pass "F1 verify-hooks 항목(build-checker.sh) 보존"
     else
-        fail "F1 기존 verify-hooks 항목(npx tsc --noEmit) 소실"
+        fail "F1 verify-hooks 항목(build-checker.sh) 소실"
     fi
     if printf '%s\n' "$CMDS_F1" | grep -q 'pm2-hooks\|service-health-check\.sh'; then
         fail "F1 --with-verify-hooks 인데 pm2 훅이 배선됨 (플래그 누수)"

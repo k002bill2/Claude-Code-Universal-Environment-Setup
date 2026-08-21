@@ -412,10 +412,11 @@ const Component: React.FC<ComponentProps> = ({ ...props }) => {
       }
     ]
   },
-  "model": "claude-sonnet-5",
   "maxTokens": 16000
 }
 ```
+
+> **모델 ID 주의**: `settings.json` 에 `model` 키를 박지 마세요. 설치기는 이 키를 절대 주입하지 않으며, 모델 선택은 Claude Code CLI(`/model`)와 사용자 설정의 몫입니다. 문서에 값을 고정하면 모델 세대가 바뀔 때마다 조용히 낡습니다.
 
 #### 4.2 Background Tasks 활용
 ```bash
