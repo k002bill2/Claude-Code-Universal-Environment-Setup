@@ -9,7 +9,6 @@
 #   .claude/hooks/{skill-activator.sh, pre-compact-reminder.sh}   (chmod +x)
 #   .claude/skill-rules.json        (advisory 예시 규칙 — 최초 1회만, 이후 사용자 소유)
 #   .claude/settings.json           (실제 동작하는 훅 2개만 배선 — 이벤트 단위 딥머지)
-#   .claude/MODELS.md               (모델 ID SSOT)
 #   CLAUDE.md                       (템플릿 최소본, 이미 있으면 스킵)
 #   dev/active/.gitkeep
 #
@@ -418,7 +417,6 @@ RULES_EOF
 # ===========================================================================
 SETTINGS_JSON=$(cat <<'SETTINGS_EOF'
 {
-  "model": "claude-sonnet-5",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -543,23 +541,62 @@ else
 fi
 
 # ===========================================================================
-# 5. .claude/MODELS.md  (모델 ID SSOT)
+# 5. 레거시 .claude/MODELS.md 정리
 # ===========================================================================
-install_managed "$CLAUDE_DIR/MODELS.md" <<'MODELS_EOF'
-# MODELS.md — 모델/CLI 단일 진실 소스(SSOT)
+# 모델 ID 는 settings.json 의 model 필드에서 관리한다. 이 설치기는 더 이상
+# MODELS.md 를 만들지 않지만(stale 버전 관리 이슈), 예전 버전이 이미 깔아 둔
+# 사본은 아무도 지우지 않아 남는다. 그 파일은 낡은 모델 ID·CLI 버전을 "SSOT"
+# 라고 주장하므로 방치하면 없는 것보다 해롭다.
+#
+# 정책(설치기의 소유권 규칙과 동일): 과거에 이 설치기가 배포한 내용과 해시가
+# 정확히 일치하면 = 사용자가 손대지 않은 installer 소유물이므로 제거한다.
+# 한 글자라도 다르면 사용자 편집으로 보고 절대 지우지 않고 안내만 남긴다.
+#
+# LEGACY_MODELS_HASHES 는 이 리포가 실제로 배포한 MODELS.md 본문의 sha256 목록이다
+# (git 이력 전수 조사 결과 현재 1종). 새 변형이 배포된 적이 있다면 여기에 추가한다.
+LEGACY_MODELS_HASHES="53d7b0c692a8671dd4fb2f184e0cd2100e03e73c0735e87a03aed18c1addb423"
+LEGACY_MODELS_KEPT=false
 
-> 이 파일이 이 프로젝트의 모델 ID·CLI 버전 SSOT 입니다.
-> 다른 문서·설정은 값을 중복 기재하지 말고 **이 파일을 참조**하세요.
+legacy_models_hash() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" 2>/dev/null | awk '{print $1}'
+  else
+    printf ''
+  fi
+}
 
-| 역할 | 모델 | API ID |
-|------|------|--------|
-| 플래그십 (복잡 추론, 1M 변형 존재) | Opus 4.8 | `claude-opus-4-8` |
-| 최상위 추론 / 장기 에이전트 | Fable 5 | `claude-fable-5` |
-| 코딩 / 에이전트 메인 (1M) | Sonnet 5 | `claude-sonnet-5` |
-| 경량 / 빠른 반복 (200K) | Haiku 4.5 | `claude-haiku-4-5-20251001` |
-
-- Claude Code CLI: `v2.1.210`
-MODELS_EOF
+MODELS_LEGACY_PATH="$CLAUDE_DIR/MODELS.md"
+# 사용자가 만든 심볼릭 링크는 내용이 우연히 레거시와 같아도 우리 것이 아니다.
+# `-f` 는 링크를 따라가므로 `rm -f` 가 사용자의 링크를 지운다 — 먼저 걸러낸다.
+if [ -L "$MODELS_LEGACY_PATH" ]; then
+  LEGACY_MODELS_KEPT=true
+  log "keep  : $MODELS_LEGACY_PATH (사용자 심볼릭 링크 — 자동 삭제하지 않음)"
+elif [ -f "$MODELS_LEGACY_PATH" ]; then
+  _lm_cur="$(legacy_models_hash "$MODELS_LEGACY_PATH")"
+  _lm_known=false
+  if [ -n "$_lm_cur" ]; then
+    for _lm_h in $LEGACY_MODELS_HASHES; do
+      if [ "$_lm_cur" = "$_lm_h" ]; then _lm_known=true; break; fi
+    done
+  fi
+  if $_lm_known; then
+    rm -f "$MODELS_LEGACY_PATH"
+    log "remove: $MODELS_LEGACY_PATH (레거시 — 더 이상 설치하지 않음)"
+    # CLAUDE.md 는 사용자 소유(skip-if-exists)라 갱신되지 않는다. 구버전이 만든
+    # CLAUDE.md 가 방금 지운 파일을 "모델 SSOT" 로 가리키고 있으면, 존재하지 않는
+    # 파일을 정본이라 말하는 지시만 남는다. 우리가 남의 파일을 고칠 수는 없으니
+    # 조용히 지나가지 말고 알린다.
+    if [ -f "$TARGET/CLAUDE.md" ] && grep -q 'MODELS\.md' "$TARGET/CLAUDE.md" 2>/dev/null; then
+      log "[DANGLING-MODELS-REF] $TARGET/CLAUDE.md 가 방금 제거된 .claude/MODELS.md 를 아직 참조합니다"
+      log "                      → 해당 줄을 지우거나 '모델 ID: settings.json 의 model 필드' 로 바꾸세요"
+    fi
+  else
+    LEGACY_MODELS_KEPT=true
+    log "keep  : $MODELS_LEGACY_PATH (사용자 편집본 — 자동 삭제하지 않음)"
+  fi
+fi
 
 # ===========================================================================
 # 6. CLAUDE.md  (템플릿 최소본 — 이미 있으면 절대 덮지 않음)
@@ -599,7 +636,7 @@ install_skip_if_exists "$TARGET/CLAUDE.md" <<'CLAUDEMD_EOF'
 
 ## Reference
 
-- 모델/CLI SSOT: `.claude/MODELS.md`
+- 모델 ID: `.claude/settings.json` 의 `model` 필드 (Claude Code CLI 가 관리)
 CLAUDEMD_EOF
 
 # ===========================================================================
@@ -655,6 +692,12 @@ echo "다음 단계:"
 echo "  1) 배선된 훅은 전부 advisory(리마인더)입니다 — 작업/도구를 차단하지 않습니다."
 echo "     실제 도구 차단이 필요하면 deny 반환 PreToolUse 훅을 별도 구성하세요."
 echo "  2) jq(권장) 또는 node 가 있으면 skill-activator/settings 병합이 정확히 동작합니다."
-echo "  3) 모델/CLI 값은 .claude/MODELS.md(SSOT)를 참조하세요."
+echo "  3) 모델 ID 는 settings.json 의 model 필드에서 관리합니다(MODELS.md 는 더 이상 설치하지 않음)."
+if $LEGACY_MODELS_KEPT; then
+  echo "     [LEGACY-MODELS-KEPT] .claude/MODELS.md 가 남아 있습니다 — 내용이 수정되어 있어"
+  echo "     자동 삭제하지 않았습니다. 낡은 모델 ID/CLI 버전을 SSOT 로 주장하는 파일이므로"
+  echo "     확인 후 직접 삭제하세요:  rm .claude/MODELS.md"
+  echo "     CLAUDE.md 등에 이 파일을 가리키는 문장이 남아 있다면 함께 정리하세요."
+fi
 echo "  4) settings.json 이 이미 있었다면 백업본과 병합 결과를 확인하세요."
 echo "=================================================="
