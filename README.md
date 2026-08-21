@@ -80,6 +80,22 @@ cd Claude-Code-Universal-Environment-Setup
 | codex 플러그인·login, MCP 시크릿, GSD/Gstack, pm2-logrotate | POST-INSTALL 체크리스트 수동 |
 | 실행형 훅 4종 (stop 자가검증·build-checker·post-tool-failure·service-health-check) | 루트 직접 → `.claude/hooks/` (파일은 항상, 배선은 옵트인 — 아래 참조) |
 
+## Sync From Live (설치 전 역동기화)
+
+이 리포는 라이브 하네스(`~/.claude`)의 **설치 가능한 스냅샷**이다. 라이브가 앞서
+진화한 상태에서 `install.sh` 를 재실행하면 라이브가 구버전으로 롤백된다.
+설치(특히 재설치) 전에 반드시 스냅샷을 라이브 기준으로 갱신하라:
+
+```bash
+scripts/sync-from-live.sh              # rules / skills / skillOverrides 동기화 + CLAUDE.md 블록 드리프트 보고
+scripts/sync-from-live.sh --write-claude-block   # advisor heredoc 블록까지 갱신
+git diff                               # 검토 후 커밋 → install.sh
+```
+
+라이브에서 삭제된 스킬·심볼릭링크 스킬은 자동 처리하지 않고 경고만 출력한다
+(파괴적 결정은 사람이 한다). 페이로드에서 스킬을 제거하면 이후 업그레이드에서
+manifest 소유분에 한해 stale sweep 으로 정리된다 (아래 '업스트림에서 제거된 자산').
+
 ## Install Policy (파일 정책 · 멱등성)
 
 세 부류로 나뉩니다:
