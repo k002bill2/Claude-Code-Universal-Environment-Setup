@@ -23,7 +23,7 @@ _SAFE_SEGMENT = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
 
 
 COMMAND_TEMPLATE = '''---
-description: {description}
+{frontmatter}
 ---
 
 # {command_title}
@@ -31,27 +31,28 @@ description: {description}
 {body}
 '''
 
-COMMAND_TEMPLATE_WITH_TOOLS = '''---
-allowed-tools: {allowed_tools}
-description: {description}
----
+# frontmatter 필드 출력 순서. 고정 템플릿을 옵션 조합으로 고르면 3개 필드 = 8가지 조합을
+# 템플릿 3개가 덮지 못해 '--argument-hint 만' 같은 조합에서 값이 조용히 사라진다.
+# 존재하는 필드만 이 순서로 조립한다 (description 은 항상 채워지므로 언제나 포함된다).
+_FRONTMATTER_ORDER = ('allowed-tools', 'argument-hint', 'description', 'model')
 
-# {command_title}
 
-{body}
-'''
-
-COMMAND_TEMPLATE_FULL = '''---
-allowed-tools: {allowed_tools}
-argument-hint: {argument_hint}
-description: {description}
-model: {model}
----
-
-# {command_title}
-
-{body}
-'''
+def build_frontmatter(
+    description: str,
+    allowed_tools: str = None,
+    argument_hint: str = None,
+    model: str = None
+) -> str:
+    """값이 있는 frontmatter 필드만 정해진 순서로 조립한다."""
+    values = {
+        'allowed-tools': allowed_tools,
+        'argument-hint': argument_hint,
+        'description': description,
+        'model': model,
+    }
+    return '\n'.join(
+        f'{key}: {values[key]}' for key in _FRONTMATTER_ORDER if values[key]
+    )
 
 
 def title_case(name: str) -> str:
@@ -142,29 +143,17 @@ def init_command(
     description = description or f"[TODO: Brief description of /{command_name}]"
     body = body or f"[TODO: Add instructions for /{command_name}]\n\n$ARGUMENTS"
 
-    # Choose template based on options
-    if allowed_tools and argument_hint and model:
-        content = COMMAND_TEMPLATE_FULL.format(
+    # frontmatter 는 주어진 옵션만으로 조립한다 — 어떤 조합이든 값이 유실되지 않는다.
+    content = COMMAND_TEMPLATE.format(
+        frontmatter=build_frontmatter(
+            description=description,
             allowed_tools=allowed_tools,
             argument_hint=argument_hint,
-            description=description,
-            model=model,
-            command_title=command_title,
-            body=body
-        )
-    elif allowed_tools:
-        content = COMMAND_TEMPLATE_WITH_TOOLS.format(
-            allowed_tools=allowed_tools,
-            description=description,
-            command_title=command_title,
-            body=body
-        )
-    else:
-        content = COMMAND_TEMPLATE.format(
-            description=description,
-            command_title=command_title,
-            body=body
-        )
+            model=model
+        ),
+        command_title=command_title,
+        body=body
+    )
 
     # Write command file
     try:
