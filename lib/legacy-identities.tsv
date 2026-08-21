@@ -1,0 +1,20 @@
+# lib/legacy-identities.tsv — 구버전(base 438aaf9) 설치가 남긴 "이제는 폐기된" identity
+#
+# 용도: .settings-manifest 가 없는 구버전 설치를 이주시킬 때의 제거 후보.
+#
+# 범위가 좁은 이유 — base 전부가 아니라 (base - 현재 조각) 만 담는다:
+#   base 와 현재가 **공유하는** identity 는 사용자가 독립적으로 직접 만들었을
+#   수도 있다. 이주 목록에 넣으면 소유로 주장되고(= foreign 에서 빠지고),
+#   --uninstall 이 사용자 항목을 지운다. 구분할 수 없으면 주장하지 않는다.
+#   제거 동작은 그대로다 — removals = prev - new 라 공유분은 어차피 안 지운다.
+#
+# 형식: <fragment-id><TAB><record>   (record 는 .settings-manifest 와 동일)
+# 자동 생성물이다. 손으로 고치지 말 것. 드리프트 검증: tests/test-fragments.sh F9
+cli-orchestration.json	perm	allow	Bash(docker *)
+cli-orchestration.json	perm	allow	Bash(git *)
+cli-orchestration.json	perm	allow	Bash(npm *)
+guardrails.json	hook	Notification	*	jq -r '.message' | head -1 | xargs -I{} osascript -e 'display notification "{}" with title "Claude Code"' 2>/dev/null || true
+guardrails.json	hook	PreToolUse	Bash	python3 -c "import json,sys; d=json.load(sys.stdin); c=d.get('tool_input',{}).get('command',''); bad=['rm -rf /','DROP TABLE','FORMAT']; sys.exit(2) if any(b in c for b in bad) else sys.exit(0)"
+guardrails.json	hook	PreToolUse	Edit|Write	python3 -c "import json,sys; p=json.load(sys.stdin).get('tool_input',{}).get('file_path',''); protected=['.env','.env.local','secrets','credentials','.git/']; sys.exit(2) if any(x in p for x in protected) else sys.exit(0)"
+verification-hooks.json	hook	PostToolUse	Write(*.tsx)	npm run lint:fix
+verification-hooks.json	hook	PostToolUse	Write(*.tsx)	npx tsc --noEmit
