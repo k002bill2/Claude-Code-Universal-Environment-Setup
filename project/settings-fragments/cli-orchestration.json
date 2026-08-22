@@ -12,17 +12,5 @@
       "Bash(git branch:*)",
       "Bash(git checkout:*)"
     ]
-  },
-  "hooks": {
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Agent completed: $AGENT_NAME'"
-          }
-        ]
-      }
-    ]
   }
 }

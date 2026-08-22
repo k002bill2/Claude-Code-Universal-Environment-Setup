@@ -10,6 +10,7 @@
 #
 # 형식: <fragment-id><TAB><record>   (record 는 .settings-manifest 와 동일)
 # 자동 생성물이다. 손으로 고치지 말 것. 드리프트 검증: tests/test-fragments.sh F9
+cli-orchestration.json	hook	SubagentStop		echo 'Agent completed: $AGENT_NAME'
 cli-orchestration.json	perm	allow	Bash(docker *)
 cli-orchestration.json	perm	allow	Bash(git *)
 cli-orchestration.json	perm	allow	Bash(npm *)

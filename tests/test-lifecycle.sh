@@ -999,9 +999,24 @@ fi
 # ============================================================================
 # L15: 구버전 이주가 "현재도 배포 중인 identity" 까지 주장하면 안 된다
 #
-# base 와 현재 조각이 공유하는 identity(예: cli-orchestration 의 SubagentStop 훅)는
+# base 와 현재 조각이 공유하는 identity(예: verification-hooks 의 PreCompact 훅)는
 # 사용자가 독립적으로 직접 만들었을 수도 있다. 이주 목록에 넣어 소유로 주장하면
 # --uninstall 이 사용자 항목을 지운다. 구분할 수 없으면 주장하지 않는다.
+#
+# 픽스처가 verification-hooks 를 쓰는 이유: cli-orchestration 은 base 와 공유하는
+# identity 가 더 이상 하나도 없다(base 의 광범위 권한 3종·SubagentStop 훅이 전부
+# 폐기됨 → 전량 이주 목록행). 공유분이 남은 조각으로 옮겨야 검사가 유효하다.
+# `--with-verify-hooks` 없이는 이 조각이 settings 에 병합되지 않아 "현재도 배포 중"
+# 이라는 전제가 성립하지 않는다 — 플래그를 빼면 검사가 헛돈다.
+#
+# 픽스처가 폐기된 SubagentStop 훅까지 담는 이유: legacy_corroborated() 는 이주 목록의
+# identity 가 **전부** 있을 때만 발동한다(구버전 설치기 지문). 목록에 그 훅이 들어간
+# 뒤로는 훅 없는 픽스처가 지문에 미달해 광범위 권한 제거(L15-1)마저 일어나지 않는다.
+#
+# 같은 이유로 verification-hooks 의 폐기 identity(Write(*.tsx) 훅 2종)도 픽스처에 담는다.
+# 그것이 없으면 그 조각의 이주가 아예 발동하지 않아, PreCompact 가 살아남은 것이
+# "과잉 주장을 안 했기 때문"인지 "이주 자체가 안 돌았기 때문"인지 구분할 수 없다
+# (= L15-2 가 헛돈다). 실측으로 확인한 함정이다.
 # ============================================================================
 echo "=== L15: 이주 과잉 주장 금지 (공유 identity 보존) ==="
 H15="${SANDBOX_ROOT}/l15-home"
@@ -1012,12 +1027,20 @@ cat > "${P15}/.claude/settings.json" <<'EOF'
   "hooks": {
     "SubagentStop": [
       { "matcher": "", "hooks": [ { "type": "command", "command": "echo 'Agent completed: $AGENT_NAME'" } ] }
+    ],
+    "PreCompact": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "echo 'Context will be compacted - check dev docs'" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write(*.tsx)", "hooks": [
+          { "type": "command", "command": "npm run lint:fix" },
+          { "type": "command", "command": "npx tsc --noEmit" } ] }
     ]
   },
   "permissions": { "allow": ["Bash(npm *)", "Bash(git *)", "Bash(docker *)"] }
 }
 EOF
-HOME="$H15" bash "${REPO_DIR}/install.sh" --project "$P15" \
+HOME="$H15" bash "${REPO_DIR}/install.sh" --with-verify-hooks --project "$P15" \
     > "${SANDBOX_ROOT}/l15-1.log" 2>&1 < /dev/null
 S15="${P15}/.claude/settings.json"
 ALLOW15="$(jq -rc '.permissions.allow // []' "$S15")"
@@ -1025,9 +1048,23 @@ case "$ALLOW15" in
     *'Bash(npm *)'*|*'Bash(git *)'*) fail "L15-1 폐기된 광범위 권한 잔존: ${ALLOW15}" ;;
     *) pass "L15-1 폐기된 광범위 권한은 이주로 제거" ;;
 esac
-HOME="$H15" bash "${REPO_DIR}/install.sh" --uninstall --project "$P15" \
-    > "${SANDBOX_ROOT}/l15-2.log" 2>&1 < /dev/null
+# 폐기 대상은 권한만이 아니다 — base 가 배포했고 현재 조각이 더 이상 선언하지 않는
+# SubagentStop 훅도 이주로 사라져야 한다. 그러지 않으면 기존 설치에 죽은 훅이 남는다.
 if settings_commands "$S15" | grep -q "Agent completed"; then
+    fail "L15-1b 폐기된 SubagentStop 훅 잔존 — 기존 설치가 정리되지 않음"
+else
+    pass "L15-1b 폐기된 SubagentStop 훅은 이주로 제거"
+fi
+# 헛돎 방지: verification-hooks 의 이주가 실제로 발동했는지 먼저 확인한다.
+# 발동하지 않았다면 아래 "보존됨" 은 아무것도 증명하지 않는다.
+if settings_commands "$S15" | grep -q "npx tsc --noEmit"; then
+    fail "L15-1c verification-hooks 이주 미발동 (폐기 훅 잔존) — L15-2 가 헛돈다"
+else
+    pass "L15-1c verification-hooks 이주가 실제로 발동함 (폐기 훅 제거됨)"
+fi
+HOME="$H15" bash "${REPO_DIR}/install.sh" --uninstall --with-verify-hooks --project "$P15" \
+    > "${SANDBOX_ROOT}/l15-2.log" 2>&1 < /dev/null
+if settings_commands "$S15" | grep -q "Context will be compacted"; then
     pass "L15-2 공유 identity(사용자 것일 수 있음)는 uninstall 후에도 보존"
 else
     fail "L15-2 uninstall 이 공유 identity 를 삭제함 — 이주 목록 과잉 주장"
