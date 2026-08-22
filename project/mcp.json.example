@@ -1,17 +1,14 @@
 {
-  "_comment": "출처: docs/Claude code system setup/Claude Code 완벽 가이드북 2026.md — 프로젝트 루트에 .mcp.json으로 복사 후 경로·환경변수를 프로젝트에 맞게 수정하세요 (시크릿은 ${ENV_VAR} 자리표시자, 하드코딩 금지). filesystem 허용 경로와 postgres 접속 URL 은 env 가 아니라 positional 인자로 전달합니다. database 서버는 'export DATABASE_URL=postgresql://user:pass@host:5432/db' 후 사용하세요 — Claude Code 가 .mcp.json 의 ${VAR} 를 확장합니다.",
+  "_comment": "출처: docs/Claude code system setup/Claude Code 완벽 가이드북 2026.md — 프로젝트 루트에 .mcp.json으로 복사 후 경로·환경변수를 프로젝트에 맞게 수정하세요 (시크릿은 ${ENV_VAR} 자리표시자, 하드코딩 금지). filesystem 허용 경로는 env 가 아니라 positional 인자로 전달합니다. Claude Code 가 .mcp.json 의 ${VAR} 를 확장합니다.",
+  "_deprecated_note": "업스트림 modelcontextprotocol/servers 가 Puppeteer·PostgreSQL 레퍼런스 서버를 아카이브했습니다(https://github.com/modelcontextprotocol/servers-archived, npm 상 deprecated). 브라우저 자동화는 유지보수 중인 @playwright/mcp 로 교체했습니다. DB 접속은 공식 후속이 없으므로 예시에서 제외했습니다 — 사용 중인 DB 벤더가 제공하는 MCP 서버(Supabase·Neon 등)를 직접 추가하세요.",
   "mcpServers": {
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src", "./tests", "./docs"]
     },
-    "puppeteer": {
+    "playwright": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
-    },
-    "database": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"]
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }

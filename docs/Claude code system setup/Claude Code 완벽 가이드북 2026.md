@@ -438,25 +438,23 @@ Ctrl+B npm test -- --watch
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["@modelcontextprotocol/server-filesystem"],
-      "env": {
-        "ALLOWED_PATHS": "./src,./tests,./docs"
-      }
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src", "./tests", "./docs"]
     },
-    "puppeteer": {
+    "playwright": {
       "command": "npx",
-      "args": ["@modelcontextprotocol/server-puppeteer"]
-    },
-    "database": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-postgres"],
-      "env": {
-        "DATABASE_URL": "${DATABASE_URL}"
-      }
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }
 ```
+
+> 허용 경로는 `ALLOWED_PATHS` 환경변수가 아니라 **positional 인자**로 전달합니다.
+>
+> 업스트림 `modelcontextprotocol/servers` 가 Puppeteer·PostgreSQL 레퍼런스 서버를
+> [아카이브](https://github.com/modelcontextprotocol/servers-archived)했고 npm 에서도
+> deprecated 입니다. 브라우저 자동화는 유지보수 중인 `@playwright/mcp` 를 쓰고,
+> DB 접속은 공식 후속이 없으므로 사용 중인 벤더의 MCP 서버(Supabase·Neon 등)를
+> 직접 추가하세요. 동일한 구성이 `project/mcp.json.example` 에 있습니다.
 
 ### Phase 6: 플러그인 설정 (신규) 🔌
 
@@ -736,9 +734,9 @@ ls .claude/skills/
 ## 📚 추가 리소스
 
 ### 공식 문서
-- [Claude Code Overview](https://docs.anthropic.com/en/docs/claude-code/overview)
-- [Agent Skills Documentation](https://docs.anthropic.com/en/docs/claude-code/skills)
-- [Sub-agents Guide](https://docs.anthropic.com/en/docs/claude-code/sub-agents)
+- [Claude Code Overview](https://code.claude.com/docs/en/overview)
+- [Agent Skills Documentation](https://code.claude.com/docs/en/skills)
+- [Sub-agents Guide](https://code.claude.com/docs/en/sub-agents)
 - [Agent Teams](https://code.claude.com/docs/ko/agent-teams)
 - [Claude Agent SDK](https://www.anthropic.com/engineering/building-agents-with-the-claude-agent-sdk)
 - [Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
