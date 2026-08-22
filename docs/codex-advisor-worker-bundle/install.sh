@@ -1275,7 +1275,8 @@ cat > "${TMP_BLOCK}" <<'CLAUDEMD'
 
 > `~/.claude/CLAUDE.md`. 이 지침은 권고(context)이며, 실제 모델 고정은
 > `~/.claude/agents/` 서브에이전트의 `model:` 필드로 강제한다. 검증은 Codex 플러그인이 담당한다.
-> 개정 이력·근거 서사는 `~/.claude/HISTORY.md` (install.sh 가 번들 HISTORY.md 를 동기화 — 필요할 때만 읽기).
+> 개정 이력·근거 서사는 `~/.claude/HISTORY.md` (라이브 전용 누적 기록 — 설치기가 배포하지도
+> 덮어쓰지도 않는다. 새 개정의 근거는 이 파일에 직접 추가한다. 필요할 때만 읽기).
 
 ## 핵심: 조언자–작업자–검증 (Advisor–Worker–Codex)
 - 조언자(Advisor · Opus): 설계·판단·최종 결정. 구현은 아래 "위임 판단" 절의 조건으로 직접/위임을 고른다.
