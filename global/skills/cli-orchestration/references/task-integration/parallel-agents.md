@@ -30,8 +30,8 @@ Claude Code의 Agent 도구를 활용하여 여러 서브에이전트를 병렬�
 | 에이전트 | CLI 작업 | 병렬화 가능 |
 |----------|----------|-------------|
 | `test-automation-specialist` | `npm test`, `npm run coverage` | Yes |
-| `performance-optimizer` | `npm run analyze`, `lighthouse` | Yes |
-| `backend-integration-specialist` | `docker-compose`, `npm run typecheck` | Partial |
+| `general-purpose` | `npm run analyze`, `lighthouse` | Yes |
+| `api-architect` | `docker-compose`, `npm run typecheck` | Partial |
 | `Bash` (기본) | 모든 CLI 명령어 | Yes |
 
 ## 병렬 실행 전략
@@ -68,11 +68,11 @@ specialized_distribution:
       model: "haiku"  # 빠른 모델
 
     - task: "빌드 성능 분석"
-      agent: "performance-optimizer"
+      agent: "general-purpose"
       model: "sonnet"
 
     - task: "타입체크 및 Docker 빌드"
-      agent: "backend-integration-specialist"
+      agent: "api-architect"
       model: "haiku"
 ```
 
@@ -199,7 +199,7 @@ concurrency:
   per_type:
     "Bash": 3
     "test-automation-specialist": 1
-    "performance-optimizer": 1
+    "general-purpose": 1
 
   # 리소스 기반 제한
   resource_based:
@@ -219,7 +219,7 @@ priority:
     - agent: "test-automation-specialist"
       priority: "normal"
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       priority: "low"  # 분석은 마지막
 ```
 

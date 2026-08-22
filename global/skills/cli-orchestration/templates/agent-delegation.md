@@ -51,7 +51,7 @@ delegation:
 
       timeout: 600000
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       task: |
         번들 분석을 수행하세요:
         1. 번들 크기 측정
@@ -64,7 +64,7 @@ delegation:
 
       timeout: 300000
 
-    - agent: "backend-integration-specialist"
+    - agent: "api-architect"
       task: |
         타입 안전성을 검사하세요:
         1. TypeScript 체크
@@ -111,13 +111,13 @@ delegation:
     - phase: 2
       condition: "phase_1.all_success"
       parallel:
-        - agent: "web-ui-specialist"
+        - agent: "ui-developer"
           task: "프론트엔드 빌드"
           input:
             command: "npm run build"
             optimize: true
 
-        - agent: "backend-integration-specialist"
+        - agent: "api-architect"
           task: "백엔드 빌드"
           input:
             command: "npm run build"
@@ -152,14 +152,14 @@ delegation:
         2. 누락된 테스트 케이스 식별
         3. 테스트 추가 권장사항
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       task: |
         PR의 성능 영향을 분석하세요:
         1. 번들 크기 변화
         2. 렌더링 성능 영향
         3. 최적화 기회
 
-    - agent: "backend-integration-specialist"
+    - agent: "api-architect"
       task: |
         PR의 타입 안전성을 검토하세요:
         1. 타입 변경 사항
@@ -183,7 +183,7 @@ delegation:
 "test-automation-specialist한테 테스트 실행 시켜줘"
 
 # 성능 분석 에이전트에 위임
-"performance-optimizer로 번들 분석해줘"
+"general-purpose로 번들 분석해줘"
 
 # 상세 지시
 "test-automation-specialist에게 커버리지 80% 이상 확인하도록 위임해줘"
@@ -196,7 +196,7 @@ delegation:
 "테스트, 성능 분석, 타입 체크 병렬로 실행해줘"
 
 # 에이전트 지정
-"test-automation-specialist와 performance-optimizer 동시에 실행해줘"
+"test-automation-specialist와 general-purpose 동시에 실행해줘"
 ```
 
 ### 순차 위임
@@ -212,12 +212,12 @@ delegation:
 |------|--------------|------|
 | 테스트 실행 | test-automation-specialist | 유닛/E2E 테스트 |
 | 커버리지 분석 | test-automation-specialist | 테스트 커버리지 |
-| 번들 최적화 | performance-optimizer | 번들 크기, 청킹 |
-| 성능 분석 | performance-optimizer | 런타임 성능 |
-| API 개발 | backend-integration-specialist | FastAPI, DB |
-| 타입 체크 | backend-integration-specialist | TypeScript |
-| UI 개발 | web-ui-specialist | React 컴포넌트 |
-| 스타일링 | web-ui-specialist | TailwindCSS |
+| 번들 최적화 | general-purpose | 번들 크기, 청킹 |
+| 성능 분석 | general-purpose | 런타임 성능 |
+| API 개발 | api-architect | FastAPI, DB |
+| 타입 체크 | api-architect | TypeScript |
+| UI 개발 | ui-developer | React 컴포넌트 |
+| 스타일링 | ui-developer | TailwindCSS |
 
 ## 결과 집계
 
@@ -232,11 +232,11 @@ aggregation:
       weight: 0.4
       metrics: [test_pass_rate, coverage]
 
-    performance-optimizer:
+    general-purpose:
       weight: 0.3
       metrics: [bundle_size, load_time]
 
-    backend-integration-specialist:
+    api-architect:
       weight: 0.3
       metrics: [type_safety, api_health]
 
@@ -268,13 +268,13 @@ output:
             tests_passed: 142
             coverage: 82%
 
-        - agent: "performance-optimizer"
+        - agent: "general-purpose"
           status: "success"
           metrics:
             bundle_size: "245KB"
             recommendations: 3
 
-        - agent: "backend-integration-specialist"
+        - agent: "api-architect"
           status: "success"
           metrics:
             type_errors: 0
@@ -299,7 +299,7 @@ error_handling:
 
     fallback:
       test-automation-specialist: "cli-worker"
-      performance-optimizer: "Bash"
+      general-purpose: "Bash"
 
     escalate:
       to: user
@@ -314,7 +314,7 @@ timeout:
 
   per_agent:
     test-automation-specialist: 600000
-    performance-optimizer: 300000
+    general-purpose: 300000
 
   on_timeout:
     cancel: true

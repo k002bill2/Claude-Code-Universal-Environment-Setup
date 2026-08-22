@@ -6,7 +6,7 @@ description: >-
   트리거: 2개 이상의 에이전트가 필요한 복합 작업, 병렬 실행 요청, 크로스 영역
   작업 조율, "에이전트 나눠서", "병렬로 처리" 등 오케스트레이션 요청 시 자동 위임.
 model: opus
-tools: Task, Read, Grep, Glob, Bash
+tools: Agent, Read, Grep, Glob, Bash
 ---
 
 # Primary Coordinator (총괄 조정자)

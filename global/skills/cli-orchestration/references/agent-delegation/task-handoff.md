@@ -125,7 +125,7 @@ orchestrator:
       tasks:
         - to: "test-automation-specialist"
           task: "유닛 테스트"
-        - to: "performance-optimizer"
+        - to: "general-purpose"
           task: "번들 분석"
   - await_all_results
   - aggregate_results
@@ -143,7 +143,7 @@ orchestrator:
       task: "테스트 실행"
   - await_result
   - handoff:
-      to: "performance-optimizer"
+      to: "general-purpose"
       task: "빌드 최적화"
       context:
         previous: "{{previous_result}}"
@@ -164,7 +164,7 @@ orchestrator:
       condition: "result.status == 'success'"
       then:
         handoff:
-          to: "performance-optimizer"
+          to: "general-purpose"
           task: "빌드 최적화"
       else:
         handoff:
@@ -385,7 +385,7 @@ workflow:
         then:
           - handoff:
               id: "h2"
-              to: "performance-optimizer"
+              to: "general-purpose"
               task:
                 type: "bundle_analysis"
               context:

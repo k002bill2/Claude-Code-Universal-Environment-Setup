@@ -87,9 +87,9 @@ worker_delegation:
 pattern: specialist
 agents:
   - test-automation-specialist
-  - performance-optimizer
-  - backend-integration-specialist
-  - web-ui-specialist
+  - general-purpose
+  - api-architect
+  - ui-developer
 ```
 
 ## 에이전트 선택 매트릭스
@@ -100,9 +100,9 @@ agents:
 | 병렬 빌드 | 중간 | cli-worker | Worker |
 | 테스트 실행 | 중간 | test-automation-specialist | Specialist |
 | 커버리지 분석 | 높음 | test-automation-specialist | Specialist |
-| 번들 최적화 | 높음 | performance-optimizer | Specialist |
-| API 구현 | 높음 | backend-integration-specialist | Specialist |
-| UI 컴포넌트 | 높음 | web-ui-specialist | Specialist |
+| 번들 최적화 | 높음 | general-purpose | Specialist |
+| API 구현 | 높음 | api-architect | Specialist |
+| UI 컴포넌트 | 높음 | ui-developer | Specialist |
 
 ## 위임 결정 로직
 
@@ -130,11 +130,11 @@ delegation_logic:
       test:
         agent: "test-automation-specialist"
       performance:
-        agent: "performance-optimizer"
+        agent: "general-purpose"
       backend:
-        agent: "backend-integration-specialist"
+        agent: "api-architect"
       frontend:
-        agent: "web-ui-specialist"
+        agent: "ui-developer"
       default:
         agent: "cli-worker"
 ```
@@ -147,15 +147,15 @@ keyword_matching:
     keywords: ["test", "테스트", "coverage", "커버리지", "jest", "vitest"]
     commands: ["npm test", "npm run test:*", "npx jest"]
 
-  performance-optimizer:
+  general-purpose:
     keywords: ["성능", "performance", "bundle", "번들", "optimize", "최적화"]
     commands: ["npm run analyze", "npm run lighthouse"]
 
-  backend-integration-specialist:
+  api-architect:
     keywords: ["api", "backend", "서버", "database", "db"]
     commands: ["npm run typecheck", "docker-compose"]
 
-  web-ui-specialist:
+  ui-developer:
     keywords: ["ui", "컴포넌트", "component", "스타일", "style"]
     commands: ["npm run storybook", "npm run dev"]
 ```
@@ -189,10 +189,10 @@ delegate:
     - agent: "test-automation-specialist"
       task: "유닛 테스트 실행"
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       task: "번들 크기 분석"
 
-    - agent: "backend-integration-specialist"
+    - agent: "api-architect"
       task: "API 타입 체크"
 
   aggregate_results: true
@@ -210,7 +210,7 @@ delegate:
       task: "테스트 실행"
       pass_result_to_next: true
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       task: "테스트 통과한 빌드 최적화"
       condition: "previous.success"
 ```
@@ -240,10 +240,10 @@ delegation:
     suggestions: [string]
 ```
 
-### performance-optimizer
+### general-purpose
 
 ```yaml
-agent: performance-optimizer
+agent: general-purpose
 capabilities:
   - bundle_analysis
   - code_splitting
@@ -262,10 +262,10 @@ delegation:
     optimizations_applied: [string]
 ```
 
-### backend-integration-specialist
+### api-architect
 
 ```yaml
-agent: backend-integration-specialist
+agent: api-architect
 capabilities:
   - api_development
   - database_operations
@@ -283,10 +283,10 @@ delegation:
     artifacts: [string]
 ```
 
-### web-ui-specialist
+### ui-developer
 
 ```yaml
-agent: web-ui-specialist
+agent: ui-developer
 capabilities:
   - component_development
   - styling
@@ -331,7 +331,7 @@ timeout_handling:
 
   per_agent:
     test-automation-specialist: 600000  # 10분
-    performance-optimizer: 300000        # 5분
+    general-purpose: 300000        # 5분
 
   on_timeout:
     cancel_task: true

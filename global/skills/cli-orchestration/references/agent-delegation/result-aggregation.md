@@ -33,7 +33,7 @@ aggregation:
       - name: "test-automation-specialist"
         status: "success"
         output: {...}
-      - name: "performance-optimizer"
+      - name: "general-purpose"
         status: "success"
         output: {...}
     overall_status: "success"
@@ -79,8 +79,8 @@ aggregation:
 
   weights:
     test-automation-specialist: 0.4
-    performance-optimizer: 0.3
-    backend-integration-specialist: 0.3
+    general-purpose: 0.3
+    api-architect: 0.3
 
   # 가중 평균 계산
   scoring: "weighted_average"
@@ -111,7 +111,7 @@ merge:
     - from: "test-automation-specialist"
       fields: ["test_results", "coverage"]
 
-    - from: "performance-optimizer"
+    - from: "general-purpose"
       fields: ["bundle_size", "recommendations"]
 ```
 
@@ -124,7 +124,7 @@ merge:
     - source: "test-automation-specialist.coverage"
       target: "quality_metrics.test_coverage"
 
-    - source: "performance-optimizer.bundle_size"
+    - source: "general-purpose.bundle_size"
       target: "quality_metrics.bundle_size"
 ```
 
@@ -158,14 +158,14 @@ aggregated_result:
           failed: 0
         coverage: 85.2
 
-    - name: "performance-optimizer"
+    - name: "general-purpose"
       status: "success"
       duration: 30000
       output:
         bundle_size: 245000
         recommendations: [...]
 
-    - name: "backend-integration-specialist"
+    - name: "api-architect"
       status: "success"
       duration: 25000
       output:
@@ -226,8 +226,8 @@ analysis:
     # 에이전트별 시간
     durations:
       test-automation-specialist: 45000
-      performance-optimizer: 30000
-      backend-integration-specialist: 25000
+      general-purpose: 30000
+      api-architect: 25000
 ```
 
 ### 품질 분석
@@ -265,8 +265,8 @@ result: |
   | 에이전트 | 상태 | 시간 |
   |---------|------|------|
   | test-automation-specialist | Success | 45s |
-  | performance-optimizer | Success | 30s |
-  | backend-integration-specialist | Success | 25s |
+  | general-purpose | Success | 30s |
+  | api-architect | Success | 25s |
 
   ### 품질 점수: 92/100
 
@@ -301,7 +301,7 @@ result:
       action: "커버리지 90% 달성을 위해 5개 파일 테스트 추가 필요"
 
     - priority: medium
-      agent: "performance-optimizer"
+      agent: "general-purpose"
       action: "lodash를 lodash-es로 교체하여 10KB 감소 가능"
 ```
 
@@ -318,7 +318,7 @@ error_aggregation:
           message: "2 tests failed"
           details: [...]
 
-    - agent: "backend-integration-specialist"
+    - agent: "api-architect"
       errors:
         - type: "type_error"
           message: "3 type errors found"
@@ -351,10 +351,10 @@ workflow:
     - agent: "test-automation-specialist"
       task: "테스트 실행"
 
-    - agent: "performance-optimizer"
+    - agent: "general-purpose"
       task: "번들 분석"
 
-    - agent: "backend-integration-specialist"
+    - agent: "api-architect"
       task: "타입 체크"
 
   # 2. 결과 수집
@@ -369,9 +369,9 @@ workflow:
     select:
       - from: "test-automation-specialist"
         fields: ["test_results", "coverage"]
-      - from: "performance-optimizer"
+      - from: "general-purpose"
         fields: ["bundle_size", "recommendations"]
-      - from: "backend-integration-specialist"
+      - from: "api-architect"
         fields: ["type_errors"]
 
   # 4. 분석

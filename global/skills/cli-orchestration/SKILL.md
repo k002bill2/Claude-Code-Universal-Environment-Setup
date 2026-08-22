@@ -131,13 +131,19 @@ Agent(subagent_type="general-purpose", prompt="...")
 각 에이전트 결과를 TaskOutput으로 수집 → 통합 리포트
 ```
 
-| 작업 유형 | 에이전트 |
-|----------|---------|
-| 단순/병렬 CLI | `cli-worker` (Haiku) |
-| 테스트 | `test-automation-specialist` |
-| 성능 분석 | `general-purpose` |
-| 백엔드 | `backend-integration-specialist` |
-| UI | `web-ui-specialist` |
+| 작업 유형 | 에이전트 | 출처 (설치 조건) |
+|----------|---------|------------------|
+| 단순/병렬 CLI 명령 | (에이전트 불필요 — Bash 병렬 호출) | — |
+| 병렬 CLI 작업 위임 | `cli-worker` (Haiku) | `global/agents/` — 글로벌 설치 |
+| 워크플로우 총괄 | `cli-orchestrator` (Sonnet) | `global/agents/` — 글로벌 설치 |
+| 빌드·테스트 실행 검증 | `test-automation-specialist` | `project/agents/` — **프로젝트 설치 필요** |
+| 성능 분석·범용 조사 | `general-purpose` | 내장 |
+| 백엔드/API | `api-architect` | `examples/agents/` — **`--with-examples` 필요** |
+| UI | `ui-developer` | `examples/agents/` — **`--with-examples` 필요** |
+
+출처를 함께 적는 이유: 이 스킬은 글로벌(`~/.claude/skills/`)인데 표의 절반은 프로젝트·예시
+레벨 에이전트다. 해당 설치를 하지 않았으면 그 행은 **존재하지 않는 에이전트를 가리킨다** —
+위임 전에 `~/.claude/agents/` 와 `<project>/.claude/agents/` 에 실제로 있는지 확인한다.
 
 ## Resource Limits
 
