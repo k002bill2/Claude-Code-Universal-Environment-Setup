@@ -706,6 +706,73 @@ else
 fi
 
 # ============================================================================
+# Test H: 글로벌 에이전트 배포 (global/agents → ~/.claude/agents)
+#
+# cli-orchestration 스킬이 cli-orchestrator/cli-worker 를 전제로 쓰는데 페이로드에
+# 없어서, 설치만 하면 스킬이 존재하지 않는 에이전트를 가리켰다.
+#
+# 폭발 반경 주의: ~/.claude/agents/ 는 조언자 번들도 쓴다(architect/worker/analyzer/
+# researcher). 번들은 manifest 에 기록하지 않으므로 스윕 대상이 아니지만, 그 불변식이
+# 깨지면 재설치가 남의 에이전트를 지운다 — H3 가 그 경계를 지킨다.
+# ============================================================================
+echo "=== Test H: 글로벌 에이전트 배포 ==="
+HOME_H="${SANDBOX_ROOT}/home-h"
+mkdir -p "$HOME_H"
+LOG_H="${SANDBOX_ROOT}/run-h.log"
+HOME="$HOME_H" bash "$INSTALL" --global-only > "$LOG_H" 2>&1 < /dev/null
+RC=$?
+if [ "$RC" -eq 0 ]; then
+    pass "H0 글로벌 설치 exit 0"
+else
+    fail "H0 글로벌 설치 exit ${RC} (log tail: $(tail -5 "$LOG_H" | tr '\n' ' '))"
+fi
+
+H_MISSING=""
+for a in cli-orchestrator cli-worker; do
+    [ -f "${HOME_H}/.claude/agents/${a}.md" ] || H_MISSING="${H_MISSING} ${a}"
+done
+if [ -z "$H_MISSING" ]; then
+    pass "H1 페이로드 에이전트 설치됨 (cli-orchestrator, cli-worker)"
+else
+    fail "H1 설치되지 않은 에이전트:${H_MISSING}"
+fi
+
+# manifest 에 기록되어야 uninstall/스윕이 소유를 안다
+H_UNTRACKED=""
+for a in cli-orchestrator cli-worker; do
+    grep -q "^agents/${a}\.md	" "${HOME_H}/.claude/.manifest" 2>/dev/null \
+        || H_UNTRACKED="${H_UNTRACKED} ${a}"
+done
+if [ -z "$H_UNTRACKED" ]; then
+    pass "H2 manifest 에 소유 기록됨"
+else
+    fail "H2 manifest 미기록 (uninstall 이 남긴다):${H_UNTRACKED}"
+fi
+
+# 남의 에이전트 불가침: 번들이 만든 것처럼 manifest 밖 파일을 두고 재설치해도 살아야 한다.
+printf -- '---\nname: architect\n---\nuser owned\n' > "${HOME_H}/.claude/agents/architect.md"
+HOME="$HOME_H" bash "$INSTALL" --global-only > "${SANDBOX_ROOT}/run-h2.log" 2>&1 < /dev/null
+if [ -f "${HOME_H}/.claude/agents/architect.md" ]; then
+    pass "H3 manifest 밖 에이전트는 재설치에도 보존 (번들 architect/worker 불가침)"
+else
+    fail "H3 재설치가 manifest 밖 에이전트를 삭제함 — 조언자 번들 산출물 파괴"
+fi
+
+# 헛돎 방지: 설치기가 실제로 이 파일들을 소유하는지 — uninstall 로 확인
+HOME="$HOME_H" bash "$INSTALL" --uninstall --global-only \
+    > "${SANDBOX_ROOT}/run-h3.log" 2>&1 < /dev/null
+if [ ! -f "${HOME_H}/.claude/agents/cli-worker.md" ]; then
+    pass "H4 uninstall 이 설치기 소유 에이전트를 제거"
+else
+    fail "H4 uninstall 후에도 cli-worker.md 잔존 — 소유 추적 실패"
+fi
+if [ -f "${HOME_H}/.claude/agents/architect.md" ]; then
+    pass "H5 uninstall 이 manifest 밖 에이전트는 보존"
+else
+    fail "H5 uninstall 이 사용자/번들 에이전트를 삭제함"
+fi
+
+# ============================================================================
 # 결과 요약
 # ============================================================================
 echo ""

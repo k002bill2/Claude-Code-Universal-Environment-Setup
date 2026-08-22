@@ -11,6 +11,7 @@ set -euo pipefail
 #
 # 동기화 대상 (방향은 전부 live → repo, 라이브는 읽기만 한다):
 #   1. ~/.claude/rules/*.md            → global/rules/
+#   1b. ~/.claude/agents/<repo 소유>.md → global/agents/
 #   2. ~/.claude/skills/<repo 소유 스킬> → global/skills/  (심볼릭링크는 스킵)
 #   3. ~/.claude/settings.json 의 skillOverrides
 #                                      → global/settings-fragments/skill-overrides.json
@@ -38,6 +39,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAUDE_HOME="${HOME}/.claude"
 RULES_DST="${SCRIPT_DIR}/global/rules"
+AGENTS_DST="${SCRIPT_DIR}/global/agents"
 SKILLS_DST="${SCRIPT_DIR}/global/skills"
 OVERRIDES_DST="${SCRIPT_DIR}/global/settings-fragments/skill-overrides.json"
 ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
@@ -91,7 +93,27 @@ for f in "${RULES_DST}/"*.md; do
   fi
 done
 
-# ── 2. skills (repo 가 이미 소유한 스킬만) ────────────────────────────────
+# ── 2. agents (repo 가 이미 소유한 에이전트만) ───────────────────────────
+# rules 루프처럼 라이브를 순회하면 안 된다 — 라이브에는 조언자 번들이 만든
+# architect/worker 와 gsd-* 수십 개가 있어 전부 페이로드로 딸려온다.
+echo "▶ agents: ~/.claude/agents → global/agents (repo 소유분만)"
+for f in "${AGENTS_DST}/"*.md; do
+  [ -f "$f" ] || continue
+  name="$(basename "$f")"
+  src="${CLAUDE_HOME}/agents/${name}"
+  if [ ! -f "$src" ]; then
+    note "WARN: ${name} 이 라이브에 없음 — 사용자가 삭제했다면 repo 에서도 제거하세요 (자동 삭제 안 함)."
+  elif cmp -s "$src" "$f"; then
+    note "UNCHANGED: ${name}"
+  elif $DRY_RUN; then
+    note "[DRY RUN] Would sync: ${name}"
+  else
+    cp "$src" "$f"
+    note "SYNCED: ${name}"
+  fi
+done
+
+# ── 3. skills (repo 가 이미 소유한 스킬만) ────────────────────────────────
 echo "▶ skills: ~/.claude/skills → global/skills (repo 소유분만)"
 for d in "${SKILLS_DST}/"*/; do
   [ -d "$d" ] || continue
@@ -113,7 +135,7 @@ for d in "${SKILLS_DST}/"*/; do
   fi
 done
 
-# ── 3. skillOverrides 스냅샷 ─────────────────────────────────────────────
+# ── 4. skillOverrides 스냅샷 ─────────────────────────────────────────────
 echo "▶ skillOverrides: ~/.claude/settings.json → skill-overrides.json"
 if ! command -v jq >/dev/null 2>&1; then
   note "스킵: jq 없음"
@@ -133,7 +155,7 @@ else
   fi
 fi
 
-# ── 4. CLAUDE.md 마커 블록 → advisor heredoc ─────────────────────────────
+# ── 5. CLAUDE.md 마커 블록 → advisor heredoc ─────────────────────────────
 echo "▶ CLAUDE.md 블록: ~/.claude/CLAUDE.md → advisor 설치기 heredoc"
 LIVE_MD="${CLAUDE_HOME}/CLAUDE.md"
 if [ ! -f "$LIVE_MD" ] || [ ! -f "$ADVISOR_INSTALLER" ]; then
@@ -179,7 +201,7 @@ else
   fi
 fi
 
-# ── 5. 훅 JS / statusline 브리지 → advisor 설치기 heredoc ────────────────
+# ── 6. 훅 JS / statusline 브리지 → advisor 설치기 heredoc ────────────────
 # 4 와 같은 규율을 두 번 더 적용한다: 앵커 1쌍 검증 → 동일하면 UNCHANGED →
 # 다르면 기본은 보고만, 플래그가 있을 때만 스플라이스 + `bash -n` 게이트.
 # 4 의 인라인 구현은 검증된 코드라 건드리지 않는다(회귀 위험). 공통화는 이 절 안에서만 한다.

@@ -975,7 +975,7 @@ manifest_source_candidates() {
     local scope="$1" rel="$2" rest dirname sub d
     if [ "$scope" = "global" ]; then
         case "$rel" in
-            rules/*|skills/*)
+            rules/*|skills/*|agents/*)
                 printf '%s\n' "${SCRIPT_DIR}/global/${rel}"
                 ;;
             docs/claude-code-setup/*)
@@ -1426,6 +1426,16 @@ install_global() {
         name="$(basename "$d")"
         install_managed_dir "$d" "${CLAUDE_HOME}/skills/${name}" "~/.claude/skills/${name}/"
     done
+    # 글로벌 에이전트. cli-orchestration 스킬이 cli-orchestrator/cli-worker 를 전제로
+    # 쓰고 있는데 페이로드에 없어서, 설치만 하면 스킬이 없는 에이전트를 가리켰다.
+    # 주의: 조언자 번들(docs/codex-advisor-worker-bundle/install.sh)이 만드는
+    # architect/worker/analyzer/researcher 는 manifest 에 기록되지 않는다 — 스윕은
+    # manifest 항목만 순회하므로 그 4종을 건드리지 않는다.
+    for f in "${SCRIPT_DIR}/global/agents/"*.md; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        install_managed_file "$f" "${CLAUDE_HOME}/agents/${name}" "~/.claude/agents/${name}"
+    done
     install_global_docs
     install_global_settings
     sweep_removed_fragments "${CLAUDE_HOME}/settings.json" "$GLOBAL_FRAGMENTS_DIR" \
@@ -1650,6 +1660,15 @@ print_checklist() {
     echo "       /plugin install codex@codex"
     echo "     이후 터미널에서: codex login"
     echo "  2. MCP: .mcp.json.example 을 .mcp.json 으로 리네임하고 시크릿(토큰/키)을 주입"
+    # .mcp.json.example 은 skip-if-exists 라 기존 설치에는 갱신본이 닿지 않는다.
+    # 폐기된 업스트림 서버를 실제로 쓰고 있을 때만 알린다(--global-only 는 PROJECT_DIR 이 빈다).
+    if [ -n "${PROJECT_DIR:-}" ] && [ -f "${PROJECT_DIR}/.mcp.json" ] && \
+       grep -q 'server-puppeteer\|server-postgres' "${PROJECT_DIR}/.mcp.json" 2>/dev/null; then
+        echo "     ⚠ 현재 .mcp.json 이 아카이브된 서버를 참조합니다"
+        echo "       (@modelcontextprotocol/server-puppeteer, server-postgres — npm deprecated)."
+        echo "       브라우저 자동화는 @playwright/mcp 로 교체하고, DB 는 공식 후속이 없으므로"
+        echo "       사용 중인 벤더의 MCP 서버로 바꾸세요. 예시: .mcp.json.example 참조."
+    fi
     echo "  3. PM2(--with-pm2): docs/templates/pm2/ 커스터마이징 후 로그 로테이션 설정:"
     echo "       pm2 install pm2-logrotate"
     echo "       pm2 set pm2-logrotate:max_size 10M"
