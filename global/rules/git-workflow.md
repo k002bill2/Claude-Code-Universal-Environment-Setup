@@ -18,7 +18,13 @@ co-author 푸터(`Co-Authored-By` + `Claude-Session`)는 **자동 주입을 전�
 
 ## Feature Implementation Workflow
 
-계획 → TDD(SSOT: golden-principles.md) → 리뷰는 superpowers 스킬과 네이티브 `/review`를 사용. 완료 후 Conventional Commits 형식으로 커밋 & 푸시.
+계획 → TDD(SSOT: golden-principles.md) → 리뷰 → 완료 후 Conventional Commits 형식으로 커밋 & 푸시.
+
+리뷰 도구는 목적이 다르다:
+- 구현 중 자기 점검: superpowers 스킬(`requesting-code-review` 등), `/code-review`, `/security-review`.
+- **완료 게이트: Codex** (`/codex:review`). `~/.claude/CLAUDE.md` 의 '검증은 무조건' 절이 정본이며
+  직접 구현이든 위임이든 생략하지 않는다 — 자기 결과를 자기가 승인하지 않는 것이 핵심이다.
+- `/review` 는 네이티브 커맨드가 아니라 로컬 스킬(`~/.claude/skills/review/`, user-invocable-only)이다.
 
 ## PR 작성
 
