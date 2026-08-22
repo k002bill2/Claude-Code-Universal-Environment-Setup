@@ -222,12 +222,12 @@ context_filter:
       to: "coverage_threshold"
 ```
 
-## Task 도구 사용
+## Agent 도구 사용
 
-### Task 호출 형식
+### Agent 호출 형식
 
 ```yaml
-# Orchestrator가 Task 도구 사용
+# Orchestrator가 Agent 도구 사용
 task_call:
   subagent_type: "test-automation-specialist"
   description: "테스트 실행 및 커버리지 분석"

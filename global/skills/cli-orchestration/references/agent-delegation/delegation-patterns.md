@@ -10,8 +10,8 @@ CLI 오케스트레이션에서 에이전트 위임을 위한 패턴과 전략�
 CLI Orchestration Skill (워크플로우 정의)
     │
     ├── Direct Bash → 단순 CLI 명령
-    ├── Task(cli-worker) → 병렬 CLI 작업
-    └── Task(specialist) → 도메인별 전문 에이전트
+    ├── Agent(cli-worker) → 병렬 CLI 작업
+    └── Agent(specialist) → 도메인별 전문 에이전트
 ```
 
 ## 위임 패턴 유형

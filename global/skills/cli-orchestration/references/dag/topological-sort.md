@@ -214,7 +214,7 @@ def detect_cycle(dag):
 
 ## CLI Orchestration 적용
 
-### Task 도구와의 통합
+### Agent 도구와의 통합
 
 ```yaml
 # 실행 계획 생성

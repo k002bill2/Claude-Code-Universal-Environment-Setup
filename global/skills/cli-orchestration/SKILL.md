@@ -123,9 +123,9 @@ packages/shared → packages/ui → packages/app (의존성 순서)
 
 ```
 # 위임 패턴
-Task(subagent_type="cli-worker", prompt="...", run_in_background=true)
-Task(subagent_type="test-automation-specialist", prompt="...")
-Task(subagent_type="general-purpose", prompt="...")
+Agent(subagent_type="cli-worker", prompt="...")
+Agent(subagent_type="test-automation-specialist", prompt="...")
+Agent(subagent_type="general-purpose", prompt="...")
 
 # 결과 집계
 각 에이전트 결과를 TaskOutput으로 수집 → 통합 리포트

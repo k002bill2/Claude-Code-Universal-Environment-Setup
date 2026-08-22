@@ -95,7 +95,7 @@ command 2>&1 | while IFS= read -r line; do
 done
 ```
 
-### Task 도구 상태 조회
+### Agent 도구 상태 조회
 
 ```yaml
 polling_strategy:

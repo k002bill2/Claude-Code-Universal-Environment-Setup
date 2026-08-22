@@ -1,6 +1,6 @@
 # Parallel Agents Protocol
 
-Claude Code의 Task 도구를 활용하여 여러 서브에이전트를 병렬로 실행하는 프로토콜입니다.
+Claude Code의 Agent 도구를 활용하여 여러 서브에이전트를 병렬로 실행하는 프로토콜입니다.
 
 ## 개요
 
@@ -96,31 +96,42 @@ fan_out_fan_in:
 
 ## 구현 패턴
 
-### Task 도구 병렬 호출
+### 병렬 호출: Bash 인가 Agent 인가
+
+순수 CLI 명령은 서브에이전트가 필요 없다 — Bash 호출을 한 메시지에 모아 병렬 실행한다
+(`subagent_type` 에는 도구 이름이 올 수 없다):
 
 ```yaml
-# 단일 메시지에서 여러 Task 도구 호출
-parallel_task_calls:
-  - tool: Task
+# 단일 메시지에서 여러 Bash 도구 호출
+parallel_bash_calls:
+  - tool: Bash
     params:
-      subagent_type: "Bash"
+      command: "cd packages/frontend && npm run build"
       description: "Frontend 빌드"
-      prompt: "cd packages/frontend && npm run build"
       run_in_background: true
 
-  - tool: Task
+  - tool: Bash
     params:
-      subagent_type: "Bash"
+      command: "cd packages/backend && npm run build"
       description: "Backend 빌드"
-      prompt: "cd packages/backend && npm run build"
       run_in_background: true
 
-  - tool: Task
+  - tool: Bash
     params:
-      subagent_type: "Bash"
+      command: "cd packages/shared && npm run build"
       description: "Shared 빌드"
-      prompt: "cd packages/shared && npm run build"
       run_in_background: true
+```
+
+조사·구현처럼 판단이 필요한 작업만 Agent 로 위임한다:
+
+```yaml
+parallel_agent_calls:
+  - tool: Agent
+    params:
+      subagent_type: "cli-worker"
+      description: "빌드 실패 원인 조사"
+      prompt: "packages/backend 빌드 로그를 분석해 실패 원인을 특정하세요"
 ```
 
 ### 결과 수집

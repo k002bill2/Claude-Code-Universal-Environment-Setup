@@ -163,18 +163,20 @@ rollback:
 
 ## Claude Code 구현 패턴
 
-### Task 도구로 병렬 에이전트 실행
+### 병렬 실행: Bash 도구 vs Agent 도구
 
-복잡한 병렬 작업은 Task 도구로 서브에이전트 활용:
+독립적인 CLI 명령은 Bash 도구 호출을 한 메시지에 모아 병렬 실행합니다
+(서브에이전트가 필요 없습니다 — `subagent_type` 에 도구 이름은 올 수 없습니다):
 
 ```markdown
-여러 에이전트가 CLI 작업을 병렬로 수행:
+독립 CLI 명령 3건을 병렬로 수행:
 
-1. Task(subagent_type="Bash", prompt="npm run lint 실행")
-2. Task(subagent_type="Bash", prompt="npm run typecheck 실행")
-3. Task(subagent_type="Bash", prompt="npm test 실행")
+1. Bash(command="npm run lint")
+2. Bash(command="npm run typecheck")
+3. Bash(command="npm test")
 
-모두 동시에 호출하여 병렬 실행
+세 호출을 같은 메시지에 담으면 동시에 실행됩니다.
+조사·구현처럼 판단이 필요한 작업만 Agent(subagent_type="...") 로 위임합니다.
 ```
 
 ### 결과 통합 리포트
