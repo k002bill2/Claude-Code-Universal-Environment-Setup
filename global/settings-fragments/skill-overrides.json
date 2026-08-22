@@ -20,7 +20,6 @@
     "gstack-document-release": "off",
     "gstack-design-consultation": "off",
     "gstack-investigate": "off",
-    "gstack-connect-chrome": "off",
     "gstack-open-gstack-browser": "off",
     "gstack-qa-only": "off",
     "gstack-context-restore": "off",
