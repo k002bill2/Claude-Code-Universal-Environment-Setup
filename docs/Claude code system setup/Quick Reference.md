@@ -333,9 +333,9 @@ You are a specialist in...
 
 ## 🔗 필수 링크
 
-- [공식 문서](https://docs.anthropic.com/en/docs/claude-code)
-- [Skills 문서](https://docs.anthropic.com/en/docs/claude-code/skills)
-- [Sub-agents 가이드](https://docs.anthropic.com/en/docs/claude-code/sub-agents)
+- [공식 문서](https://code.claude.com/docs)
+- [Skills 문서](https://code.claude.com/docs/en/skills)
+- [Sub-agents 가이드](https://code.claude.com/docs/en/sub-agents)
 - [Agent Teams](https://code.claude.com/docs/ko/agent-teams)
 - [커뮤니티](https://discord.gg/anthropic)
 

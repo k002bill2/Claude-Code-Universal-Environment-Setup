@@ -218,9 +218,9 @@ tags:
 ## 🔗 유용한 링크
 
 ### 공식 문서
-- [Claude Code 공식 문서](https://docs.anthropic.com/en/docs/claude-code)
-- [Agent Skills 가이드](https://docs.anthropic.com/en/docs/claude-code/skills)
-- [Sub-agents 문서](https://docs.anthropic.com/en/docs/claude-code/sub-agents)
+- [Claude Code 공식 문서](https://code.claude.com/docs)
+- [Agent Skills 가이드](https://code.claude.com/docs/en/skills)
+- [Sub-agents 문서](https://code.claude.com/docs/en/sub-agents)
 - [Agent Teams](https://code.claude.com/docs/ko/agent-teams)
 
 ### 커뮤니티
