@@ -80,6 +80,17 @@ else
   note "스킵: ${CLAUDE_HOME}/rules 없음"
 fi
 
+# 역방향 점검: repo 가 가진 rule 이 라이브에서 사라졌는지.
+# 위 루프는 라이브를 순회하므로 삭제된 rule 은 방문조차 되지 않는다 — 별도 패스가 필요하다.
+# (skills 루프가 repo 소유분을 순회해 WARN 을 낼 수 있는 것과 같은 이유.)
+for f in "${RULES_DST}/"*.md; do
+  [ -f "$f" ] || continue
+  name="$(basename "$f")"
+  if [ ! -f "${CLAUDE_HOME}/rules/${name}" ]; then
+    note "WARN: ${name} 이 라이브에 없음 — 사용자가 삭제했다면 repo 에서도 제거하세요 (자동 삭제 안 함)."
+  fi
+done
+
 # ── 2. skills (repo 가 이미 소유한 스킬만) ────────────────────────────────
 echo "▶ skills: ~/.claude/skills → global/skills (repo 소유분만)"
 for d in "${SKILLS_DST}/"*/; do
