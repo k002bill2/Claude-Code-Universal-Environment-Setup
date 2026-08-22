@@ -772,6 +772,59 @@ else
     fail "H5 uninstall 이 사용자/번들 에이전트를 삭제함"
 fi
 
+# H6: 페이로드에서 빠진 에이전트가 라이브에서도 사라지는가.
+#
+# manifest_source_candidates 에 agents/* 매핑을 넣은 **유일한 이유**가 이것이다.
+# H1~H5 는 매핑이 죽어 있어도 전부 통과한다(설치·소유·불가침·제거만 본다) —
+# 매핑이 없으면 sweep_removed_assets 가 후보를 못 찾아 `|| continue` 로 넘어가고,
+# 스테일 에이전트가 영구히 남는다. 그 무동작을 관측 가능하게 만드는 검사다.
+echo "=== Test H6: 업스트림에서 삭제된 에이전트 스윕 ==="
+FIX_H="${SANDBOX_ROOT}/h6-fix"
+HOME_H6="${SANDBOX_ROOT}/home-h6"
+mkdir -p "$HOME_H6"
+# 픽스처 복사를 인라인으로 둔다 — test-install.sh 는 helpers.sh 를 소싱하지 않고
+# 자체 pass/fail 을 쓴다. 소싱하면 카운터 정의가 충돌한다.
+mkdir -p "$FIX_H"
+( cd "$REPO_DIR" && find . -name .git -prune -o -type d -print 2>/dev/null ) | \
+    while IFS= read -r d; do mkdir -p "${FIX_H}/${d}"; done
+( cd "$REPO_DIR" && find . -name .git -prune -o -type f -print 2>/dev/null ) | \
+    while IFS= read -r f; do cp -p "${REPO_DIR}/${f}" "${FIX_H}/${f}"; done
+HOME="$HOME_H6" bash "${FIX_H}/install.sh" --global-only \
+    > "${SANDBOX_ROOT}/run-h6a.log" 2>&1 < /dev/null
+H6_READY=false
+if [ -f "${HOME_H6}/.claude/agents/cli-worker.md" ] && \
+   [ -f "${HOME_H6}/.claude/agents/cli-orchestrator.md" ]; then
+    pass "H6-0 두 에이전트 설치됨 (사보타주 전제 성립)"
+    H6_READY=true
+else
+    fail "H6-0 사전 설치 실패 — H6 이 헛돈다"
+fi
+# 전제가 깨진 채로 아래를 돌리면 "설치된 적 없어서 없다"가 "스윕이 지웠다"로 둔갑한다.
+# 실제로 관측한 오탐이다(helpers 미소싱으로 픽스처 복사가 no-op 이었을 때 H6-1 이 통과).
+if ! $H6_READY; then
+    fail "H6-1 전제 미성립으로 검증 불가 (H6-0 참조)"
+    fail "H6-2 전제 미성립으로 검증 불가 (H6-0 참조)"
+else
+    # 업스트림에서 하나만 제거하고 재설치
+    rm -f "${FIX_H}/global/agents/cli-worker.md"
+    HOME="$HOME_H6" bash "${FIX_H}/install.sh" --global-only \
+        > "${SANDBOX_ROOT}/run-h6b.log" 2>&1 < /dev/null
+    RC_H6=$?
+    # 재설치가 스윕만 하고 도중에 죽어도 파일은 사라진다 — exit code 를 함께 요구한다.
+    if [ "$RC_H6" -ne 0 ]; then
+        fail "H6-1 재설치가 exit ${RC_H6} (log tail: $(tail -3 "${SANDBOX_ROOT}/run-h6b.log" | tr '\n' ' '))"
+    elif [ ! -f "${HOME_H6}/.claude/agents/cli-worker.md" ]; then
+        pass "H6-1 업스트림에서 사라진 에이전트가 라이브에서도 제거됨 (exit 0)"
+    else
+        fail "H6-1 스테일 에이전트 잔존 — agents/* 스윕 매핑이 동작하지 않음"
+    fi
+    if [ -f "${HOME_H6}/.claude/agents/cli-orchestrator.md" ]; then
+        pass "H6-2 남아 있는 에이전트는 보존 (과잉 삭제 없음)"
+    else
+        fail "H6-2 스윕이 여전히 배포 중인 에이전트까지 삭제함"
+    fi
+fi
+
 # ============================================================================
 # 결과 요약
 # ============================================================================
