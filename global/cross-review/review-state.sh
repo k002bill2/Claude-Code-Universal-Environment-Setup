@@ -750,35 +750,16 @@ rs_build_prompt() {
     }
 }
 
+# 결과 스키마는 **배포되는 정적 파일**이다. 예전에는 heredoc 으로 만들어
+# `/dev/fd/5` 로 흘렸는데, codex-cli 0.153.4 는 `/dev/fd/N` 을 **읽지도 쓰지도 못한다**
+# (live smoke 실측: "Failed to read output schema file /dev/fd/5: Bad file descriptor").
+# 관리 상태 트리에는 여전히 아무것도 만들지 않는다 — 이 파일은 스크립트 옆에 있는
+# 읽기 전용 자산이라 provider 가 이미 읽을 수 있는 것과 같은 부류다(§7.3.2).
+RS_SCHEMA_FILE="${RS_SELF_DIR}/result-schema.json"
+
 rs_write_schema() {
-    cat <<'SCHEMA_JSON'
-{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schema_version", "task_id", "diff_sha256", "reviewer", "verdict", "findings"],
-  "properties": {
-    "schema_version": { "type": "integer", "enum": [1] },
-    "task_id": { "type": "string" },
-    "diff_sha256": { "type": "string" },
-    "reviewer": { "type": "string", "enum": ["claude", "codex"] },
-    "verdict": { "type": "string", "enum": ["PASS", "CHANGES_REQUESTED"] },
-    "findings": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["severity", "title", "file", "detail"],
-        "properties": {
-          "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
-          "title": { "type": "string" },
-          "file": { "type": "string" },
-          "detail": { "type": "string" }
-        }
-      }
-    }
-  }
-}
-SCHEMA_JSON
+    [ -f "$RS_SCHEMA_FILE" ] || return 1
+    cat "$RS_SCHEMA_FILE"
 }
 
 # ── 게이트 (모델 호출 전에 전부 통과해야 한다) ───────────────────────────

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "diff_sha256", "reviewer", "verdict", "findings"],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1] },
+    "task_id": { "type": "string" },
+    "diff_sha256": { "type": "string" },
+    "reviewer": { "type": "string", "enum": ["claude", "codex"] },
+    "verdict": { "type": "string", "enum": ["PASS", "CHANGES_REQUESTED"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "title", "file", "detail"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2", "P3"] },
+          "title": { "type": "string" },
+          "file": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

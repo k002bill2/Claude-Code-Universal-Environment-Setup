@@ -1472,7 +1472,10 @@ install_global_cross_review() {
     # `.sh` 만 훑던 시절에는 safe-fs.py 가 배포되지 않아, 설치된 게이트가 링크
     # 안전 연산을 찾지 못하고 **모든 리뷰를 BLOCKED 로 끝냈다**(fail closed 라
     # 조용히 통과하지는 않지만 게이트가 무용지물이 된다).
-    for f in "${CROSS_REVIEW_SRC_DIR}/"*.sh "${CROSS_REVIEW_SRC_DIR}/"*.py; do
+    # `.sh` 만 훑던 시절에는 safe-fs.py 가 빠져 게이트가 모든 리뷰를 BLOCKED 로 끝냈다.
+    # `.json`(result-schema.json)도 같은 이유로 필수다 — 없으면 Codex 어댑터가 출력
+    # 스키마를 넘기지 못해 역시 전부 BLOCKED 다.
+    for f in "${CROSS_REVIEW_SRC_DIR}/"*.sh "${CROSS_REVIEW_SRC_DIR}/"*.py "${CROSS_REVIEW_SRC_DIR}/"*.json; do
         [ -f "$f" ] || continue
         name="$(basename "$f")"
         dst="${CLAUDE_HOME}/hooks/cross-review/${name}"
@@ -1480,6 +1483,8 @@ install_global_cross_review() {
         # dry-run 은 파일을 만들지 않는다. 또 installer 소유·미변경일 때만 권한을
         # 손댄다 — 사용자가 수정해 보존된 파일에 chmod 를 걸면 "보존" 계약을
         # 내용이 아니라 권한 쪽에서 깬다. (install_project_hooks 와 같은 가드)
+        # 실행권한은 스크립트에만. 데이터 파일(.json)은 그대로 둔다.
+        case "$name" in *.json) continue ;; esac
         if ! $DRY_RUN && [ -f "$dst" ]; then
             mf_resolve "$dst"
             if [ -n "$MF_FILE" ] && \
