@@ -32,6 +32,7 @@ cd Claude-Code-Universal-Environment-Setup
 | `--with-examples` | `examples/` 스킬·에이전트를 프로젝트 `.claude/`에 추가 설치 |
 | `--with-pm2` | PM2 템플릿을 `<project>/docs/templates/pm2/`에 복사 + pm2-hooks 조각을 `settings.json`에 병합 |
 | `--with-verify-hooks` | verify-hooks 조각을 `.claude/settings.json`에 실제 병합 |
+| `--with-cross-review` | **글로벌** Claude↔Codex 교차리뷰 번들을 `~/.claude/hooks/cross-review/`에 설치 + opt-in Stop 가드를 `~/.claude/settings.json`에 병합. **기본 설치와 `--full` 은 파일조차 설치하지 않습니다** (아래 *교차리뷰 게이트*) |
 | `--uninstall` | installer가 소유한 파일과 settings hooks/permissions만 제거 (아래 *Uninstall Policy*) |
 | `-h` / `--help` | 사용법 출력 |
 
@@ -239,6 +240,57 @@ docs의 TypeScript 개념 스켈레톤을 **실행 가능한 bash**로 재작성
 | `service-health-check.sh` | `Stop` | `--with-pm2` | PM2 서비스 중 `status != online` 또는 재시작 5회 초과 감지 (수동 실행도 가능) |
 
 공통 계약: stdin으로 이벤트 JSON 수신, stdout은 advisory 컨텍스트로 주입, **항상 exit 0**(세션 미차단). `jq` 부재 시(PM2 훅은 `pm2` 부재 시에도) 조용한 no-op. 외부 명령은 자체 타임아웃으로 유계 실행하며 `npx` 네트워크 설치는 하지 않습니다.
+
+## 교차리뷰 게이트 (`--with-cross-review`, 글로벌 opt-in)
+
+작성한 agent 가 "완료" 를 선언하기 전에 **반대편 provider** 가 같은 worktree 를 read-only 로
+검토하게 하는 번들입니다. 계약 정본은
+`docs/plans/2026-09-09-global-in-session-cross-review.md`.
+
+| 설치물 | 위치 |
+|--------|------|
+| 실행 스크립트 6종 | `~/.claude/hooks/cross-review/` |
+| settings 조각 | `~/.claude/settings-fragments/cross-review.json` |
+| Stop 가드 배선 | `~/.claude/settings.json` 의 `hooks.Stop` (identity 1개) |
+| 리뷰 상태 | `~/.claude/state/cross-review/<sha256(realpath)>/` (mode 700) |
+
+- **리뷰는 author 세션이 동기로 부릅니다.** Stop 훅은 리뷰를 실행하지 않습니다 — 미검토
+  diff 로 종료했다는 사실만 상태에 기록하고 **항상 exit 0** 입니다(세션 미차단).
+- **대상 저장소를 오염시키지 않습니다.** 상태·로그는 전부 `~/.claude/state/` 아래에 있고,
+  프로젝트의 `.gitignore` 를 편집하지 않습니다.
+- **기본 설치·`--full` 은 배선도 파일 설치도 하지 않습니다.** 다른 옵트인(verify-hooks)과
+  달리 조각 *파일*조차 깔지 않습니다 — Stop 훅과 provider 호출 경로를 여는 번들이라
+  "파일이 있으니 켜진 줄 알았다" 가 생기지 않게 합니다.
+- **기존 Stop 훅과 공존합니다.** 조각 병합은 identity 단위 누적이라 사용자가 직접 쓴 Stop
+  훅이나 `stop-self-check` 가 그대로 남습니다.
+- **한 번 켜면 점착(sticky)입니다.** `--with-cross-review` 없이 재설치해도 이미 설치된
+  번들과 병합된 Stop 엔트리는 남습니다. **해제는 `--uninstall` 뿐입니다** — 플래그를 빼는
+  것은 해제가 아닙니다.
+
+**위협 모델 (중요):** 이것은 **협력적 워크플로 게이트이지 적대적 보안 경계가 아닙니다.**
+Stop 가드는 항상 exit 0 이라 리뷰를 한 번도 부르지 않고 끝낼 수 있고(상태에 기록만 남습니다),
+reviewer 는 diff 내용에 유도될 수 있는 LLM 이며, 프롬프트 구분자 nonce 는 인젝션의 문턱을 올릴 뿐
+닫지 못합니다. 이 게이트가 막는 것은 **실수와 성급한 완료 선언**이지, 게이트를 적극적으로
+속이려는 행위자가 아닙니다. 자세한 내용은 계획 문서 §11.
+
+**MCP 격리 (양쪽 reviewer 모두).** 두 provider 다 reviewer 실행 시 MCP 서버를 하나도
+로드하지 않습니다 — 수단만 다릅니다.
+
+| reviewer | 플래그 | 효과 |
+|---|---|---|
+| Codex | `--ignore-user-config` | `~/.codex/config.toml` 자체를 읽지 않음 → 거기 정의된 MCP 서버 전부 미로드. 부작용: model/profile 설정도 빠져 **CLI 기본 모델**로 동작 |
+| Claude | `--strict-mcp-config` | `--mcp-config` 로 준 것만 사용. **아무것도 주지 않으므로 0개** |
+
+두 플래그 모두 각 CLI 의 `--help` 로 실측 확인했습니다(codex-cli 0.153.4). 이 격리는
+**reviewer 호출에만** 적용되며, author 래퍼(`codex-with-review.sh`)는 사용자의 평소 설정으로
+동작합니다.
+
+**보존.** 동결 diff·프롬프트(소스 전문)와 provider stdout 원문 봉투는 성공·차단·타임아웃 어느
+결말에서도 삭제됩니다. reviewer 결과는 256KiB 상한을 넘으면 저장하지 않고 차단합니다.
+삭제 경로는 관리 루트 안이고 심볼릭 링크가 아닐 때만 동작합니다(링크 너머는 건드리지 않음).
+
+> **현재 상태: rollout HOLD.** 이 번들은 fake provider fixture 로만 검증됐습니다. 실제
+> `codex exec` / `claude -p` 를 호출하는 live smoke 는 **PENDING** 입니다.
 
 ## Out of Scope (v1) — 사유
 

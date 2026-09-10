@@ -69,6 +69,7 @@ ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
 SAFETY_DOC_SRC="${SCRIPT_DIR}/docs/Claude code system setup/Parallel Agents Safety Protocol v3.1.0.md"
 FRAGMENTS_DIR="${SCRIPT_DIR}/project/settings-fragments"
 GLOBAL_FRAGMENTS_DIR="${SCRIPT_DIR}/global/settings-fragments"
+CROSS_REVIEW_SRC_DIR="${SCRIPT_DIR}/global/cross-review"
 HOOKS_SRC_DIR="${SCRIPT_DIR}/project/hooks"
 DOCS_SRC_DIR="${SCRIPT_DIR}/docs"
 DOCS_DST_DIR="${CLAUDE_HOME}/docs/claude-code-setup"
@@ -89,6 +90,10 @@ WITH_EXAMPLES=false
 WITH_PM2=false
 WITH_VERIFY_HOOKS=false
 INSTALL_VERIFY_FRAGMENT=false
+# 교차리뷰 게이트는 **명시 opt-in 전용**이다. --full 도 이것을 켜지 않는다 —
+# Stop 훅과 provider 호출 경로를 기본 설치가 여는 순간, 사용자가 모르는 사이
+# 모든 세션 종료에 게이트가 붙는다.
+WITH_CROSS_REVIEW=false
 UNINSTALL=false
 # pm2-hooks 조각의 settings.json 병합은 --with-pm2 를 "명시"했을 때만.
 # --full 은 settings.json 배선을 늘리지 않는다(verify-hooks 와 동일한 기존 규칙).
@@ -128,6 +133,10 @@ usage() {
     echo "  --with-examples      Install examples/ assets into the project"
     echo "  --with-pm2           Copy PM2 templates + merge pm2-hooks fragment (explicit flag only)"
     echo "  --with-verify-hooks  Merge verification-hooks fragment into settings.json"
+    echo "  --with-cross-review  Install the global Claude<->Codex cross-review bundle"
+    echo "                       (~/.claude/hooks/cross-review/) and merge its opt-in"
+    echo "                       Stop guard into ~/.claude/settings.json."
+    echo "                       Never enabled by default or by --full."
     echo "  --uninstall          Remove installer-owned files and settings hooks/permissions"
     echo "                       (user-added / user-modified content is preserved)"
     echo "  -h, --help           Show this help"
@@ -149,6 +158,7 @@ while [[ $# -gt 0 ]]; do
         --with-examples)     WITH_EXAMPLES=true; ANY_FLAG=true; shift ;;
         --with-pm2)          WITH_PM2=true; PM2_HOOKS_MERGE=true; ANY_FLAG=true; shift ;;
         --with-verify-hooks) WITH_VERIFY_HOOKS=true; ANY_FLAG=true; shift ;;
+        --with-cross-review) WITH_CROSS_REVIEW=true; ANY_FLAG=true; shift ;;
         --uninstall)         UNINSTALL=true; ANY_FLAG=true; shift ;;
         -h|--help)           usage; exit 0 ;;
         *)                   log_error "Unknown option: $1"; usage; exit 1 ;;
@@ -178,6 +188,21 @@ check_prereqs() {
     if $WITH_ADVISOR; then
         if ! command -v python3 >/dev/null 2>&1 && ! command -v jq >/dev/null 2>&1; then
             log_error "--with-advisor 에는 python3 또는 jq 가 필요합니다."
+            exit 1
+        fi
+    fi
+    # 교차리뷰 게이트는 **jq 와 python3 를 실제로 요구한다**: 결과 JSON 검증이 jq 이고,
+    # 링크 안전 파일 연산이 safe-fs.py 다. 병합 엔진 전제(jq 또는 node)만 보고 설치하면
+    # node 만 있는 환경에서 게이트가 조용히 무동작(Stop 가드 즉시 종료 + 모든 리뷰
+    # BLOCKED)이 된다 — opt-in 했는데 아무것도 지켜주지 않는 상태다.
+    if $WITH_CROSS_REVIEW; then
+        if ! command -v jq >/dev/null 2>&1; then
+            log_error "--with-cross-review 에는 jq 가 필요합니다 (결과 JSON 검증)."
+            log_error "예: brew install jq  — 설치 후 재실행하세요."
+            exit 1
+        fi
+        if ! command -v python3 >/dev/null 2>&1; then
+            log_error "--with-cross-review 에는 python3 가 필요합니다 (safe-fs.py 링크 안전 연산)."
             exit 1
         fi
     fi
@@ -978,6 +1003,12 @@ manifest_source_candidates() {
             rules/*|skills/*|agents/*)
                 printf '%s\n' "${SCRIPT_DIR}/global/${rel}"
                 ;;
+            hooks/cross-review/*)
+                printf '%s\n' "${CROSS_REVIEW_SRC_DIR}/${rel#hooks/cross-review/}"
+                ;;
+            settings-fragments/*)
+                printf '%s\n' "${GLOBAL_FRAGMENTS_DIR}/${rel#settings-fragments/}"
+                ;;
             docs/claude-code-setup/*)
                 rest="${rel#docs/claude-code-setup/}"
                 case "$rest" in
@@ -1411,6 +1442,53 @@ install_global_settings() {
     merge_fragment_into "${CLAUDE_HOME}/settings.json" \
         "${GLOBAL_FRAGMENTS_DIR}/skill-overrides.json" \
         "~/.claude/settings.json <- skill-overrides.json"
+    # 교차리뷰 Stop 가드: --with-cross-review 를 **명시**했을 때만 배선한다.
+    # 조각 병합은 identity 단위 누적이므로, 사용자가 이미 가진 Stop 훅과 공존한다.
+    if $WITH_CROSS_REVIEW; then
+        install_managed_file "${GLOBAL_FRAGMENTS_DIR}/cross-review.json" \
+            "${CLAUDE_HOME}/settings-fragments/cross-review.json" \
+            "~/.claude/settings-fragments/cross-review.json"
+        merge_fragment_into "${CLAUDE_HOME}/settings.json" \
+            "${GLOBAL_FRAGMENTS_DIR}/cross-review.json" \
+            "~/.claude/settings.json <- cross-review.json"
+    fi
+}
+
+# ──────────────────────────────────────────────────────
+# 글로벌 교차리뷰 번들 (~/.claude/hooks/cross-review/) — opt-in 전용
+#   이 번들은 자기 이름공간(hooks/cross-review/) 안에만 쓴다. 기존 글로벌 훅과
+#   이름이 겹치지 않으므로 서로 덮어쓰지 않는다.
+#   plain 재설치(플래그 없음)에서는 이 함수가 돌지 않지만, 소스 파일이 여전히
+#   존재하므로 sweep_removed_assets 가 alive 로 판정해 설치본을 지우지 않는다.
+# ──────────────────────────────────────────────────────
+install_global_cross_review() {
+    local f name dst
+    $WITH_CROSS_REVIEW || return 0
+    if [ ! -d "$CROSS_REVIEW_SRC_DIR" ]; then
+        log_warn "global/cross-review 소스 없음 — 스킵"
+        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+        return 0
+    fi
+    # `.sh` 만 훑던 시절에는 safe-fs.py 가 배포되지 않아, 설치된 게이트가 링크
+    # 안전 연산을 찾지 못하고 **모든 리뷰를 BLOCKED 로 끝냈다**(fail closed 라
+    # 조용히 통과하지는 않지만 게이트가 무용지물이 된다).
+    for f in "${CROSS_REVIEW_SRC_DIR}/"*.sh "${CROSS_REVIEW_SRC_DIR}/"*.py; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        dst="${CLAUDE_HOME}/hooks/cross-review/${name}"
+        install_managed_file "$f" "$dst" "~/.claude/hooks/cross-review/${name}"
+        # dry-run 은 파일을 만들지 않는다. 또 installer 소유·미변경일 때만 권한을
+        # 손댄다 — 사용자가 수정해 보존된 파일에 chmod 를 걸면 "보존" 계약을
+        # 내용이 아니라 권한 쪽에서 깬다. (install_project_hooks 와 같은 가드)
+        if ! $DRY_RUN && [ -f "$dst" ]; then
+            mf_resolve "$dst"
+            if [ -n "$MF_FILE" ] && \
+               [ "$(manifest_get "$MF_FILE" "$MF_REL")" = "$(manifest_hash_file "$dst")" ]; then
+                rb_track "$dst"
+                chmod +x "$dst"
+            fi
+        fi
+    done
 }
 
 install_global() {
@@ -1437,6 +1515,7 @@ install_global() {
         install_managed_file "$f" "${CLAUDE_HOME}/agents/${name}" "~/.claude/agents/${name}"
     done
     install_global_docs
+    install_global_cross_review
     install_global_settings
     sweep_removed_fragments "${CLAUDE_HOME}/settings.json" "$GLOBAL_FRAGMENTS_DIR" \
         "~/.claude/settings.json"
@@ -1674,6 +1753,11 @@ print_checklist() {
     echo "       pm2 set pm2-logrotate:max_size 10M"
     echo "       pm2 set pm2-logrotate:retain 14"
     echo "       pm2 set pm2-logrotate:compress true"
+    if $WITH_CROSS_REVIEW; then
+        echo "  0. 교차리뷰 게이트가 ~/.claude/hooks/cross-review/ 에 설치되고"
+        echo "     ~/.claude/settings.json 의 Stop 에 배선됐습니다 (opt-in)."
+        echo "     해제는 --uninstall — 설치기가 소유한 identity 만 제거됩니다."
+    fi
     echo "  4. verify-hooks: .claude/settings-fragments/verification-hooks.json 은"
     echo "     --with-verify-hooks 명시 시에만 settings.json 에 병합됩니다"
     echo "     (tsc/lint 자동 훅 — 프로젝트 스택에 맞게 명령 조정 권장)."
