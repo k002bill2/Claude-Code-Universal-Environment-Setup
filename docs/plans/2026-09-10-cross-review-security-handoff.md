@@ -118,6 +118,62 @@ codex-cli 0.153.4 는 `/dev/fd/N` 을 **읽지도 쓰지도 못한다**(`--outpu
 `--json` stdout 파싱으로 교체했다. 설치기는 이제 `*.json` 도 배포한다(X26 이 감시자) —
 빠지면 게이트가 모든 리뷰를 BLOCKED 로 끝낸다.
 
+
+#### 4.5.1 스모크 절차 (Claude 어댑터에 그대로 적용)
+
+> 아래는 동시 진행하던 다른 세션이 작성한 절차다. Codex 경로는 2026-09-11 에 이 절차로
+> 통과했고, **남은 H3a(Claude 어댑터)에 그대로 쓴다**. 원문 유지 — "H3" 를 "H3a" 로 읽으면 된다.
+
+#### 4.5.1 H3 스모크 절차 (다음 세션이 그대로 따를 것)
+
+**전제 — 이것부터 확인한다.** Rollout HOLD(§12)가 금지한 provider 실행이므로 **사용자가
+명시적으로 승인한 뒤에만** 시작한다. 승인 없이는 아래를 실행하지 않는다.
+
+**격리 (실 환경 보호 — 이번 하드닝의 요지가 여기서 깨지면 안 된다).**
+
+```bash
+SB="$(mktemp -d)"; export HOME="$SB/home"; export CROSS_REVIEW_HOME="$SB/crhome"
+mkdir -p "$HOME" "$CROSS_REVIEW_HOME"
+unset CLAUDE_CONFIG_DIR
+# 리뷰 대상은 **일회용 저장소**를 쓴다. 실제 작업 저장소를 대상으로 돌리지 않는다.
+R="$(mktemp -d "$SB/repo.XXXX")"; git -C "$R" init -q
+git -C "$R" config user.email t@t.local; git -C "$R" config user.name tester
+printf 'base\n' > "$R/a.txt"; git -C "$R" add -A
+git -C "$R" -c commit.gpgsign=false commit -qm init
+printf 'changed\n' > "$R/a.txt"
+```
+
+끝난 뒤 `rm -rf "$SB"`, 그리고 `ls -d ~/.claude/state/cross-review` 가 **없음**인지 확인한다.
+
+**실행 (한 번에 하나씩, 출력 전문을 남긴다).**
+
+```bash
+CROSS_REVIEW_TIMEOUT=180 bash global/cross-review/run-codex-review.sh \
+    --worktree "$R" --author claude --task-id smoke-codex ; echo "exit=$?"
+CROSS_REVIEW_TIMEOUT=180 bash global/cross-review/run-claude-review.sh \
+    --worktree "$R" --author codex  --task-id smoke-claude ; echo "exit=$?"
+```
+
+**통과 기준 — 전부 만족해야 H3 가 닫힌다.**
+
+1. `exit=0` 이고 `phase=PASS`(또는 지적이 있으면 `CHANGES_REQUESTED`/`P2P3_CLOSED`).
+   `BLOCKED_ERROR(schema_invalid)` 는 **실패**다 — `/dev/fd` 를 못 읽었다는 뜻이다.
+2. Codex: 출력 스키마를 `/dev/fd/5` 로 읽고 최종 메시지를 `/dev/fd/4` 로 썼다.
+   → 결과가 비어 있지 않고 스키마 검증을 통과했으면 입증된 것이다.
+3. Claude: 프롬프트가 **stdin** 으로 전달됐다. `--restricted` + `--permission-prompts none`
+   조합이 **무인으로 종료**한다(멈춰서 입력을 기다리면 실패).
+4. 타임아웃 경로: `CROSS_REVIEW_TIMEOUT=5` 로 재실행 → `BLOCKED_ERROR(provider_timeout)`,
+   고아 프로세스 없음(`pgrep -f 'safe-fs.py|codex exec|claude -p'` 가 0).
+5. 관리 트리에 잔류물 없음: `find "$CROSS_REVIEW_HOME" -type f \( -name 'prompt.txt' \
+   -o -name 'schema.json' -o -name 'last.json' -o -name '*.diff' \)` 가 **빈 결과**.
+
+**실패 시 대안 (이미 정해져 있다).** Codex 가 `/dev/fd` 를 못 열면 `--json`(stdout JSONL)
+파싱으로 전환한다. 그 경우 최종 메시지 이벤트의 형태를 실측으로 확정한 뒤 필터를 쓰고,
+필터가 빈 결과를 내면 **BLOCKED 로 끝나야 한다**(조용한 PASS 금지).
+
+**닫을 때 갱신할 곳.** 계약 문서 §12-2 의 `live provider smoke = PENDING` 항목과 두 어댑터의
+"live smoke 미검증" 주석. 실측 CLI 버전(`codex --version`, `claude --version`)을 함께 적는다.
+
 ## 5. 작업 방식 — 반드시 지킬 것
 
 이 세션에서 **테스트가 초록인데 아무것도 검증하지 않던 사례가 4건** 나왔다. 그래서:
