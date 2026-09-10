@@ -32,6 +32,11 @@ set -euo pipefail
 #
 # `--output-format json` 의 stdout 은 결과의 상위집합(세션 메타데이터·비용)이므로
 # `jq` 로 `.result` 만 뽑는다. 캡처 상한은 호출자가 `head -c` 로 건다.
+#
+# **봉투는 배열이다** (claude 2.1.267 실측: `system/init` · `rate_limit_event` ·
+# `assistant` · `result/success` 순의 이벤트 배열). 단일 객체로만 읽던 옛 필터는 배열에서
+# 빈 문자열을 내보내 **모든 Claude 리뷰가 BLOCKED_ERROR** 로 끝났다(live smoke 로 잡았다).
+# 옛 CLI 가 객체를 낼 수도 있으므로 두 형태를 모두 받는다. `is_error` 인 결과는 버린다.
 cr_invoke_provider() {
     local bin="${CROSS_REVIEW_CLAUDE_BIN:-claude}" prc=0 jrc=0
     local ps
@@ -52,7 +57,10 @@ cr_invoke_provider() {
         --output-format json \
         --add-dir "$1" \
         2>/dev/null ) \
-      | jq -r 'if type == "object" then (.result // "") else "" end' 2>/dev/null
+      | jq -r 'def pick: if type == "object" then (.result // "") else "" end;
+               if type == "array"
+               then ([.[] | select(.type == "result" and (.is_error != true))] | last | pick)
+               else pick end' 2>/dev/null
     ps=("${PIPESTATUS[@]}")
     set -e
     prc="${ps[0]:-0}"; jrc="${ps[1]:-0}"
