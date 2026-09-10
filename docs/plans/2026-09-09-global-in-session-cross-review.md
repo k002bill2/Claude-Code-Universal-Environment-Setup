@@ -1,7 +1,7 @@
 # 글로벌 In-Session Claude ↔ Codex 교차리뷰 — 배포형 구현 계획
 
 - 작성일: 2026-09-09 (KST)
-- 상태: **구현 완료 / 전역 활성화 완료 / live provider smoke 통과 (2026-09-11)**
+- 상태: **구현 완료 / 전역 활성화 완료 / 양 provider live smoke 통과 (2026-09-11)**
 - 대체 대상: `docs/plans/2026-09-09-in-session-cross-review.md` (프로젝트-로컬 배치본)
 - 상위 결정: `~/.hermes/profiles/jarvis/cron/output/2026-09-09-buzz-cross-review-final-discussion.md`
 
@@ -756,7 +756,12 @@ Claude 에게는 프롬프트 본문에 같은 JSON Schema 를 함께 준다.
    - 출력 스키마 → 스크립트 옆의 **정적 자산** `result-schema.json` (관리 상태 트리 아님)
    - 결과 → `--json` 이벤트 스트림의 마지막 `agent_message` 를 `.item.text` 로 추출
 
-   Claude 어댑터(`--restricted` + stdin 프롬프트)는 여전히 **live 미검증**이다.
+   **Claude 어댑터도 같은 날 통과했고, 여기서도 계약이 깨져 있었다.** `--output-format json`
+   의 봉투는 단일 객체가 아니라 **이벤트 배열**이다(claude 2.1.267: `system/init` ·
+   `rate_limit_event` · `assistant` · `result/success`). `.result` 만 보던 필터가 배열에서
+   빈 문자열을 내 **모든 Claude 리뷰가 BLOCKED_ERROR** 로 끝났다. 배열의 마지막
+   `type=="result"`(그리고 `is_error != true`)에서 `.result` 를 뽑도록 고쳤고, 옛 CLI 의
+   객체 형태도 계속 받는다. 실측: exit 10 / `CHANGES_REQUESTED`, 18초, P0·P1 검출.
 
 3. **enable/config mutation, 외부 메시지, commit/push/merge 는 STOP/HITL.**
 4. 파일럿은 10~20 task 규모로 호출 수·소요·모델 사용량을 실측한 뒤에만 확대한다.

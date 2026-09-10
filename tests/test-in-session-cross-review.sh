@@ -248,8 +248,14 @@ case "${FAKE_MODE:-pass}" in
     slowout)
         # provider 원문을 **먼저** 뱉고 나서 상한을 넘겨 강제 종료된다.
         BODY="$(fake_emit_body claude "$TASK" "$SHA")"
+        # 실 CLI(2.1.267)의 봉투는 **이벤트 배열**이다: system/init · rate_limit_event ·
+        # assistant · result/success. 객체 하나만 흉내내면 어댑터의 배열 처리를 검증하지
+        # 못한다 — 그 간극이 실제로 모든 Claude 리뷰를 BLOCKED 로 만들었다(live smoke).
         jq -nc --arg r "$BODY" --arg c "${FAKE_CANARY:-}" \
-            '{type:"result",result:$r,is_error:false,canary:$c}'
+            '[{type:"system",subtype:"init"},
+              {type:"rate_limit_event"},
+              {type:"assistant"},
+              {type:"result",subtype:"success",result:$r,is_error:false,canary:$c}]'
         sleep 5
         exit 0 ;;
     killme)
@@ -257,8 +263,14 @@ case "${FAKE_MODE:-pass}" in
         # 테스트는 sentinel 을 본 뒤에야 바깥 어댑터를 SIGKILL 한다 — 그래야
         # "카나리 부재" 가 "provider 가 아예 안 돌았다" 로 만족되지 않는다.
         BODY="$(fake_emit_body claude "$TASK" "$SHA")"
+        # 실 CLI(2.1.267)의 봉투는 **이벤트 배열**이다: system/init · rate_limit_event ·
+        # assistant · result/success. 객체 하나만 흉내내면 어댑터의 배열 처리를 검증하지
+        # 못한다 — 그 간극이 실제로 모든 Claude 리뷰를 BLOCKED 로 만들었다(live smoke).
         jq -nc --arg r "$BODY" --arg c "${FAKE_CANARY:-}" \
-            '{type:"result",result:$r,is_error:false,canary:$c}'
+            '[{type:"system",subtype:"init"},
+              {type:"rate_limit_event"},
+              {type:"assistant"},
+              {type:"result",subtype:"success",result:$r,is_error:false,canary:$c}]'
         printf 'emitted\n' > "${FAKE_EMIT_SENTINEL:-/dev/null}"
         sleep 30
         exit 0 ;;
@@ -279,8 +291,13 @@ if [ -n "${FAKE_RESULT_CANARY:-}" ]; then
     BODY="$(printf '%s' "$BODY" | jq -c --arg c "$FAKE_RESULT_CANARY" \
         '.findings += [{severity:"P3",title:"canary",file:"a.txt",detail:$c}] | .verdict="PASS"' 2>/dev/null || printf '%s' "$BODY")"
 fi
+# 주 경로도 실 CLI 와 같은 **이벤트 배열**로 낸다. (`missing` 모드만 객체로 남겨
+# 옛 CLI 형태의 하위호환 경로도 함께 지킨다.)
 jq -nc --arg r "$BODY" --arg c "${FAKE_CANARY:-}" \
-    '{type:"result",result:$r,is_error:false,canary:$c}'
+    '[{type:"system",subtype:"init"},
+      {type:"rate_limit_event"},
+      {type:"assistant"},
+      {type:"result",subtype:"success",result:$r,is_error:false,canary:$c}]'
 # provider 가 결과를 뱉고도 0 이 아닌 코드로 끝나는 상황 (봉투 잔류 검증용)
 [ "${FAKE_MODE:-pass}" = "rc42" ] && exit 42
 exit 0

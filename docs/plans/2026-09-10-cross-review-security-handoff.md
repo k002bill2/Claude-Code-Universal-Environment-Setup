@@ -17,7 +17,7 @@ Rollout HOLD 가 금지한 실행이라 사람 승인 없이는 닫을 수 없�
 - 작업 위치: `/Users/younghwankang/orca/workspaces/Claude-Code-Universal-Environment-Setup/in-session-cross-review`
 - **금지**: `~/.codex`·자격증명·원격 Git 수정, 워크트리 밖 쓰기.
 - 2026-09-11 사용자 승인으로 해제된 항목: commit(`89fab45`), 전역 활성화
-(`install.sh --global-only --with-cross-review` 적용 완료), push, PR #5, **Codex live smoke**.
+(`install.sh --global-only --with-cross-review` 적용 완료), push, PR #5, **양 provider live smoke**.
 - 계약 문서: `docs/plans/2026-09-09-global-in-session-cross-review.md` (§7.3 이 보안 생애주기,
 §10 이 테스트 매트릭스, §12 가 Rollout HOLD).
 
@@ -106,11 +106,18 @@ fd 에 남는다. 놓는 방법은 fd 를 닫는 것뿐이고 셸이 죽으면 �
 | P1 | 잠금 파일을 셸이 열 때(`exec 9>>`) 링크를 따라갈 수 있다 — `touch` 와 열기 사이에 링크가 심기면 **링크가 가리킨 경로에 빈 파일이 생길 수 있다** | 셸 리다이렉션은 `O_NOFOLLOW` 를 못 쓴다. 열기 직전 `nolink` 확인 + 연 뒤 (dev,ino) 대조로 창을 좁혔고 잠금 자체는 거부된다. 같은 사용자가 그 파일을 직접 만들 수도 있어 **권한 상승은 없다**. 완전 차단은 드라이버를 Python 한 프로세스로 옮기는 재작성 — 계약 §11-4 |
 | P1 | `--uninstall` 이 **바이트 단위로 동일한** 사용자 Stop 훅과 설치본을 구분하지 못한다 | identity 기반 제거는 **공용 병합 엔진**의 성질이라 모든 조각(pm2·verify·skill-overrides)에 동일하며 이 게이트가 만든 결함이 아니다. 명령이 다른 사용자 훅은 보존된다(X27). occurrence 추적은 병합 엔진 별도 작업 — 계약 §11-5 |
 
-### 4.5 남은 미해결
+### 4.5 남은 미해결 — **없음**
 
-| # | 위치 | 내용 |
-|---|---|---|
-| **H3a** | `run-claude-review.sh` | Claude 어댑터(`--restricted` + `--permission-prompts none` 무인 종료, stdin 프롬프트, `--output-format json`)가 **live 미검증**. Codex 경로는 2026-09-11 에 통과했다. 비호환이면 fail closed(BLOCKED_ERROR) |
+Codex·Claude 어댑터 모두 2026-09-11 에 live smoke 를 통과했다. 두 경로 다 **fake fixture
+로는 잡히지 않던 실제 계약 결함**이 있었고(아래), 그것이 이 스모크의 존재 이유였다.
+
+| 어댑터 | 깨져 있던 것 | 교체 | 실측 |
+|---|---|---|---|
+| Codex | `/dev/fd/N` 을 읽지도 쓰지도 못함 (`--output-schema /dev/fd/5`, `--output-last-message /dev/fd/4` 둘 다 `Bad file descriptor`) | 정적 `result-schema.json` + `--json` 이벤트의 `.item.text` | exit 10, 14~17초, P0 2건 |
+| Claude | `--output-format json` 봉투가 **이벤트 배열**인데 단일 객체로만 읽어 결과가 항상 빈 문자열 | 배열의 마지막 `type=="result"`(`is_error != true`)에서 `.result` 추출, 객체 형태도 계속 수용 | exit 10, 18초, P0·P1 검출 |
+
+두 경우 모두 계획대로 **fail closed** 였다 — 조용한 PASS 는 한 번도 없었다. 픽스처도 실 CLI 와
+같은 봉투를 내도록 고쳤고, 사보타주로 RED 를 확인했다(옛 필터로 되돌리면 X2·X42·X53·X63 실패).
 
 **Codex live smoke 결과 (2026-09-11, 통과)** — 이 과정에서 계약 결함 하나를 잡았다:
 codex-cli 0.153.4 는 `/dev/fd/N` 을 **읽지도 쓰지도 못한다**(`--output-schema /dev/fd/5`,
