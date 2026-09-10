@@ -15,8 +15,9 @@ Rollout HOLD 가 금지한 실행이라 사람 승인 없이는 닫을 수 없�
 ## 1. 작업 범위와 금지사항 (그대로 유지할 것)
 
 - 작업 위치: `/Users/younghwankang/orca/workspaces/Claude-Code-Universal-Environment-Setup/in-session-cross-review`
-- **금지**: `~/.claude`·`~/.codex`·자격증명·원격 Git 수정, 설치/활성화, commit/push,
-**provider live smoke**, 워크트리 밖 쓰기.
+- **금지**: `~/.codex`·자격증명·원격 Git 수정, **provider live smoke**, 워크트리 밖 쓰기.
+- 2026-09-11 사용자 승인으로 해제된 항목: commit(`89fab45`), 전역 활성화
+(`install.sh --global-only --with-cross-review` 적용 완료). push 는 아직 하지 않았다.
 - 계약 문서: `docs/plans/2026-09-09-global-in-session-cross-review.md` (§7.3 이 보안 생애주기,
 §10 이 테스트 매트릭스, §12 가 Rollout HOLD).
 

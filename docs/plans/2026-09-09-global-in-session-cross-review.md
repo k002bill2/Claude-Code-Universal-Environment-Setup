@@ -1,7 +1,7 @@
 # 글로벌 In-Session Claude ↔ Codex 교차리뷰 — 배포형 구현 계획
 
 - 작성일: 2026-09-09 (KST)
-- 상태: **구현 완료 / rollout HOLD** — 전역 활성화·live provider smoke 미수행
+- 상태: **구현 완료 / 전역 활성화 완료(2026-09-11)** — live provider smoke 만 미수행
 - 대체 대상: `docs/plans/2026-09-09-in-session-cross-review.md` (프로젝트-로컬 배치본)
 - 상위 결정: `~/.hermes/profiles/jarvis/cron/output/2026-09-09-buzz-cross-review-final-discussion.md`
 
@@ -740,7 +740,10 @@ Claude 에게는 프롬프트 본문에 같은 JSON Schema 를 함께 준다.
 
 구현까지만 진행하고, 다음은 사람 승인 전까지 하지 않는다.
 
-1. **전역 활성화 금지** — 실제 `$HOME` 에 `--with-cross-review` 를 적용하지 않는다.
+1. ~~**전역 활성화 금지**~~ → **2026-09-11 사용자 승인으로 활성화 완료.** 실제 `$HOME` 에
+   `--global-only --with-cross-review` 적용. 검증: 스크립트 7종 설치(실행권한), 기존 Stop 훅
+   4개 전원 보존 + cross-review 1개 추가(4→5), 가드 advisory 동작 117ms·exit 0,
+   상태 디렉터리 700, 대상 저장소 무오염. 백업: `~/.claude/settings.json.bak.1`.
 2. **live provider smoke = `PENDING`** — 실제 `codex exec` / `claude -p` 로 end-to-end 를
    돌리지 않았다. **이번 배치로 미검증 가정이 늘었다**: Codex 가 `--output-schema
    /dev/fd/5` 와 `--output-last-message /dev/fd/4`(파이프)를 실제로 열어 쓰는지,
