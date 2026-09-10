@@ -1,7 +1,7 @@
 # 글로벌 In-Session Claude ↔ Codex 교차리뷰 — 배포형 구현 계획
 
 - 작성일: 2026-09-09 (KST)
-- 상태: **구현 완료 / 전역 활성화 완료(2026-09-11)** — live provider smoke 만 미수행
+- 상태: **구현 완료 / 전역 활성화 완료 / live provider smoke 통과 (2026-09-11)**
 - 대체 대상: `docs/plans/2026-09-09-in-session-cross-review.md` (프로젝트-로컬 배치본)
 - 상위 결정: `~/.hermes/profiles/jarvis/cron/output/2026-09-09-buzz-cross-review-final-discussion.md`
 
@@ -744,13 +744,19 @@ Claude 에게는 프롬프트 본문에 같은 JSON Schema 를 함께 준다.
    `--global-only --with-cross-review` 적용. 검증: 스크립트 7종 설치(실행권한), 기존 Stop 훅
    4개 전원 보존 + cross-review 1개 추가(4→5), 가드 advisory 동작 117ms·exit 0,
    상태 디렉터리 700, 대상 저장소 무오염. 백업: `~/.claude/settings.json.bak.1`.
-2. **live provider smoke = `PENDING`** — 실제 `codex exec` / `claude -p` 로 end-to-end 를
-   돌리지 않았다. **이번 배치로 미검증 가정이 늘었다**: Codex 가 `--output-schema
-   /dev/fd/5` 와 `--output-last-message /dev/fd/4`(파이프)를 실제로 열어 쓰는지,
-   Claude 가 프롬프트를 stdin 으로 받는지는 fake fixture 로만 확인했다. 실패 시 결과가
-   비어 `BLOCKED_ERROR` 로 끝난다(fail closed — 조용한 PASS 는 아니다). 스모크에서
-   이 조합이 안 되면 대안은 `--json` stdout 파싱이다. 어댑터 플래그는 이전 세션의 `--help` 실측을 승계했고, 계약은 fake
-   fixture 로 검증했다. 실제 런타임 동작(특히 `--restricted` + `--permission-prompts none`
-   조합의 무인 종료, `--output-schema` 준수율)은 **미검증**이다.
+2. ~~**live provider smoke = `PENDING`**~~ → **2026-09-11 통과.** 실 `codex exec` 로
+   end-to-end 를 돌렸다(14초, `CHANGES_REQUESTED`, P0 2건 검출, `attempt=1`·`reviewed_sha`
+   기록, run 아티팩트·원문 0건 잔류).
+
+   **그 과정에서 계약이 하나 깨져 있었음을 확인하고 고쳤다.** codex-cli 0.153.4 는
+   `/dev/fd/N` 을 **읽지도 쓰지도 못한다** — `--output-schema /dev/fd/5` 와
+   `--output-last-message /dev/fd/4` 둘 다 `Bad file descriptor (os error 9)` 로 실패한다
+   (fd 4 가 파이프가 아니라 일반 파일이어도 동일). 예고한 대로 fail closed 로 끝났을 뿐
+   조용한 PASS 는 없었다. 대체 계약:
+   - 출력 스키마 → 스크립트 옆의 **정적 자산** `result-schema.json` (관리 상태 트리 아님)
+   - 결과 → `--json` 이벤트 스트림의 마지막 `agent_message` 를 `.item.text` 로 추출
+
+   Claude 어댑터(`--restricted` + stdin 프롬프트)는 여전히 **live 미검증**이다.
+
 3. **enable/config mutation, 외부 메시지, commit/push/merge 는 STOP/HITL.**
 4. 파일럿은 10~20 task 규모로 호출 수·소요·모델 사용량을 실측한 뒤에만 확대한다.

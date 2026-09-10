@@ -14,7 +14,7 @@
 #   --sandbox read-only        모델이 실행하는 셸이 쓰기 불가
 #   --output-schema            결과 JSON 스키마를 **CLI 가** 검사
 #   --output-last-message      최종 메시지를 **CLI 가** 쓴다 (모델 write 권한 불필요).
-#                              경로 대신 /dev/fd/4 를 넘겨 파이프로 받는다 — 아래 참조.
+#                              (정적 파일 경로. /dev/fd 는 이 CLI 가 못 연다 — 아래 참조)
 #   --ignore-user-config       ~/.codex/config.toml 을 읽지 않는다 → **MCP 서버가
 #                              하나도 로드되지 않는다**. 사용자 설정에 MCP 서버가
 #                              10개 넘게 있어도 reviewer 는 전부 없이 돈다.
@@ -45,13 +45,13 @@ set -euo pipefail
 # 영속 결과 파일은 Claude 어댑터와 동일하게 O_EXCL fd 9 로만 만든다.
 cr_invoke_provider() {
     # $1 worktree. **프롬프트는 stdin, 결과는 stdout.** 결과는 파일이 되지 않는다(H1).
-    local bin="${CROSS_REVIEW_CODEX_BIN:-codex}" rc=0
-    # 관리 루트 안에 Codex 가 이름으로 여는 것이 하나도 없다:
-    #   프롬프트 → stdin · 출력 스키마 → /dev/fd/5 · 최종 메시지 → /dev/fd/4(= stdout)
-    # /dev 는 사용자가 바꿔칠 수 없으므로 조상 스왑으로 재지향되지 않는다.
-    #
-    # 주의(계획 §12): 이 조합은 **live smoke 미검증**이다. 열지 못하면 결과가 비어
-    # BLOCKED_ERROR 로 끝난다(fail closed — 조용한 PASS 는 아니다).
+    local bin="${CROSS_REVIEW_CODEX_BIN:-codex}" ps
+    # **`/dev/fd/N` 은 쓸 수 없다 (live smoke 실측, codex-cli 0.153.4).** 읽기·쓰기 양쪽
+    # 모두 "Bad file descriptor (os error 9)" 로 실패한다 — `--output-schema /dev/fd/5`,
+    # `--output-last-message /dev/fd/4` 둘 다. 그래서:
+    #   출력 스키마 → 스크립트 옆의 **정적 자산** result-schema.json (상태 트리 아님)
+    #   결과       → `--json` 이벤트 스트림에서 마지막 agent_message 를 뽑는다
+    # 관리 루트 안에 provider 가 이름으로 여는 것은 여전히 하나도 없다(§7.3.2).
     set +e
     CROSS_REVIEW_ROLE=reviewer "$bin" exec \
         --cd "$1" \
@@ -59,13 +59,17 @@ cr_invoke_provider() {
         --ignore-user-config \
         --ignore-rules \
         --ephemeral \
-        --output-schema /dev/fd/5 \
-        --output-last-message /dev/fd/4 \
+        --output-schema "$RS_SCHEMA_FILE" \
+        --json \
         --color never \
-        - 4>&1 1>/dev/null 2>/dev/null 5< <(rs_write_schema)
-    rc=$?
+        - 2>/dev/null \
+      | jq -r 'select(.type == "item.completed" and .item.type == "agent_message") | .item.text' 2>/dev/null \
+      | tail -n 1
+    ps=("${PIPESTATUS[@]}")
     set -e
-    return "$rc"
+    [ "${ps[0]:-0}" -eq 0 ] || return "${ps[0]}"
+    [ "${ps[1]:-0}" -eq 0 ] || return "${ps[1]}"
+    return 0
 }
 
 rs_review_main codex "$@"

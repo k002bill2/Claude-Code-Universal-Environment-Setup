@@ -15,9 +15,9 @@ Rollout HOLD 가 금지한 실행이라 사람 승인 없이는 닫을 수 없�
 ## 1. 작업 범위와 금지사항 (그대로 유지할 것)
 
 - 작업 위치: `/Users/younghwankang/orca/workspaces/Claude-Code-Universal-Environment-Setup/in-session-cross-review`
-- **금지**: `~/.codex`·자격증명·원격 Git 수정, **provider live smoke**, 워크트리 밖 쓰기.
+- **금지**: `~/.codex`·자격증명·원격 Git 수정, 워크트리 밖 쓰기.
 - 2026-09-11 사용자 승인으로 해제된 항목: commit(`89fab45`), 전역 활성화
-(`install.sh --global-only --with-cross-review` 적용 완료). push 는 아직 하지 않았다.
+(`install.sh --global-only --with-cross-review` 적용 완료), push, PR #5, **Codex live smoke**.
 - 계약 문서: `docs/plans/2026-09-09-global-in-session-cross-review.md` (§7.3 이 보안 생애주기,
 §10 이 테스트 매트릭스, §12 가 Rollout HOLD).
 
@@ -106,63 +106,17 @@ fd 에 남는다. 놓는 방법은 fd 를 닫는 것뿐이고 셸이 죽으면 �
 | P1 | 잠금 파일을 셸이 열 때(`exec 9>>`) 링크를 따라갈 수 있다 — `touch` 와 열기 사이에 링크가 심기면 **링크가 가리킨 경로에 빈 파일이 생길 수 있다** | 셸 리다이렉션은 `O_NOFOLLOW` 를 못 쓴다. 열기 직전 `nolink` 확인 + 연 뒤 (dev,ino) 대조로 창을 좁혔고 잠금 자체는 거부된다. 같은 사용자가 그 파일을 직접 만들 수도 있어 **권한 상승은 없다**. 완전 차단은 드라이버를 Python 한 프로세스로 옮기는 재작성 — 계약 §11-4 |
 | P1 | `--uninstall` 이 **바이트 단위로 동일한** 사용자 Stop 훅과 설치본을 구분하지 못한다 | identity 기반 제거는 **공용 병합 엔진**의 성질이라 모든 조각(pm2·verify·skill-overrides)에 동일하며 이 게이트가 만든 결함이 아니다. 명령이 다른 사용자 훅은 보존된다(X27). occurrence 추적은 병합 엔진 별도 작업 — 계약 §11-5 |
 
-### 4.5 남은 미해결 — **H3 (live smoke)** 하나
+### 4.5 남은 미해결
 
+| # | 위치 | 내용 |
+|---|---|---|
+| **H3a** | `run-claude-review.sh` | Claude 어댑터(`--restricted` + `--permission-prompts none` 무인 종료, stdin 프롬프트, `--output-format json`)가 **live 미검증**. Codex 경로는 2026-09-11 에 통과했다. 비호환이면 fail closed(BLOCKED_ERROR) |
 
-| #      | 위치                                             | 내용                                                                                                                                                                                                                                                        |
-| ------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **H3** | `run-codex-review.sh` / `run-claude-review.sh` | Codex `--output-schema /dev/fd/5` · `--output-last-message /dev/fd/4`, Claude `--restricted` + stdin 프롬프트가 **실 CLI 미검증**. 코드 결함이 아니라 검증 갭이며, Rollout HOLD 가 금지한 provider 실행이 있어야 닫힌다. 비호환 시 전부 BLOCKED(fail closed — 조용한 PASS 아님). 대안: `--json` stdout 파싱 |
-
-
-#### 4.5.1 H3 스모크 절차 (다음 세션이 그대로 따를 것)
-
-**전제 — 이것부터 확인한다.** Rollout HOLD(§12)가 금지한 provider 실행이므로 **사용자가
-명시적으로 승인한 뒤에만** 시작한다. 승인 없이는 아래를 실행하지 않는다.
-
-**격리 (실 환경 보호 — 이번 하드닝의 요지가 여기서 깨지면 안 된다).**
-
-```bash
-SB="$(mktemp -d)"; export HOME="$SB/home"; export CROSS_REVIEW_HOME="$SB/crhome"
-mkdir -p "$HOME" "$CROSS_REVIEW_HOME"
-unset CLAUDE_CONFIG_DIR
-# 리뷰 대상은 **일회용 저장소**를 쓴다. 실제 작업 저장소를 대상으로 돌리지 않는다.
-R="$(mktemp -d "$SB/repo.XXXX")"; git -C "$R" init -q
-git -C "$R" config user.email t@t.local; git -C "$R" config user.name tester
-printf 'base\n' > "$R/a.txt"; git -C "$R" add -A
-git -C "$R" -c commit.gpgsign=false commit -qm init
-printf 'changed\n' > "$R/a.txt"
-```
-
-끝난 뒤 `rm -rf "$SB"`, 그리고 `ls -d ~/.claude/state/cross-review` 가 **없음**인지 확인한다.
-
-**실행 (한 번에 하나씩, 출력 전문을 남긴다).**
-
-```bash
-CROSS_REVIEW_TIMEOUT=180 bash global/cross-review/run-codex-review.sh \
-    --worktree "$R" --author claude --task-id smoke-codex ; echo "exit=$?"
-CROSS_REVIEW_TIMEOUT=180 bash global/cross-review/run-claude-review.sh \
-    --worktree "$R" --author codex  --task-id smoke-claude ; echo "exit=$?"
-```
-
-**통과 기준 — 전부 만족해야 H3 가 닫힌다.**
-
-1. `exit=0` 이고 `phase=PASS`(또는 지적이 있으면 `CHANGES_REQUESTED`/`P2P3_CLOSED`).
-   `BLOCKED_ERROR(schema_invalid)` 는 **실패**다 — `/dev/fd` 를 못 읽었다는 뜻이다.
-2. Codex: 출력 스키마를 `/dev/fd/5` 로 읽고 최종 메시지를 `/dev/fd/4` 로 썼다.
-   → 결과가 비어 있지 않고 스키마 검증을 통과했으면 입증된 것이다.
-3. Claude: 프롬프트가 **stdin** 으로 전달됐다. `--restricted` + `--permission-prompts none`
-   조합이 **무인으로 종료**한다(멈춰서 입력을 기다리면 실패).
-4. 타임아웃 경로: `CROSS_REVIEW_TIMEOUT=5` 로 재실행 → `BLOCKED_ERROR(provider_timeout)`,
-   고아 프로세스 없음(`pgrep -f 'safe-fs.py|codex exec|claude -p'` 가 0).
-5. 관리 트리에 잔류물 없음: `find "$CROSS_REVIEW_HOME" -type f \( -name 'prompt.txt' \
-   -o -name 'schema.json' -o -name 'last.json' -o -name '*.diff' \)` 가 **빈 결과**.
-
-**실패 시 대안 (이미 정해져 있다).** Codex 가 `/dev/fd` 를 못 열면 `--json`(stdout JSONL)
-파싱으로 전환한다. 그 경우 최종 메시지 이벤트의 형태를 실측으로 확정한 뒤 필터를 쓰고,
-필터가 빈 결과를 내면 **BLOCKED 로 끝나야 한다**(조용한 PASS 금지).
-
-**닫을 때 갱신할 곳.** 계약 문서 §12-2 의 `live provider smoke = PENDING` 항목과 두 어댑터의
-"live smoke 미검증" 주석. 실측 CLI 버전(`codex --version`, `claude --version`)을 함께 적는다.
+**Codex live smoke 결과 (2026-09-11, 통과)** — 이 과정에서 계약 결함 하나를 잡았다:
+codex-cli 0.153.4 는 `/dev/fd/N` 을 **읽지도 쓰지도 못한다**(`--output-schema /dev/fd/5`,
+`--output-last-message /dev/fd/4` 둘 다 `Bad file descriptor`). 정적 `result-schema.json` +
+`--json` stdout 파싱으로 교체했다. 설치기는 이제 `*.json` 도 배포한다(X26 이 감시자) —
+빠지면 게이트가 모든 리뷰를 BLOCKED 로 끝낸다.
 
 ## 5. 작업 방식 — 반드시 지킬 것
 

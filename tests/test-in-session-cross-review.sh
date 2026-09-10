@@ -130,10 +130,16 @@ FAKE_BODY
 
 cat > "${FAKE_DIR}/codex" <<'FAKE_CODEX'
 #!/bin/bash
-# fake codex — argv 기록 + --output-last-message 에 결과 기록
+# fake codex — argv 기록 + `--json` 이벤트 스트림으로 결과를 stdout 에 낸다.
+# (실 CLI 는 `/dev/fd/N` 을 읽지도 쓰지도 못한다 — live smoke 실측. 그래서 결과는
+#  `item.completed`/`agent_message` 이벤트의 .item.text 로 온다.)
 . "$(dirname "$0")/_fake-body.sh"
 printf '%s\n' "$*" >> "${FAKE_ARGV_LOG:-/dev/null}"
 printf 'codex\n' >> "${FAKE_CALL_LOG:-/dev/null}"
+emit_event() {
+    # $1 = 결과 JSON 문자열. 실 CLI 의 `--json` 이벤트 형식 그대로 감싼다.
+    jq -nc --arg t "$1" '{type:"item.completed",item:{id:"item_0",type:"agent_message",text:$t}}'
+}
 OUT=""
 SCHEMA=""
 WORKTREE=""
@@ -173,8 +179,8 @@ esac
 if [ "${FAKE_MODE:-pass}" = "huge" ]; then
     # 스키마상 유효하지만 상한을 넘는 거대한 결과
     PAD="$(awk 'BEGIN { s=""; for (i=0;i<300000;i++) s=s "x"; print s }')"
-    [ -n "$OUT" ] && jq -nc --arg t "$TASK" --arg s "$SHA" --arg d "$PAD" \
-        '{schema_version:1,task_id:$t,diff_sha256:$s,reviewer:"codex",verdict:"PASS",findings:[{severity:"P3",title:"pad",file:"a.txt",detail:$d}]}' > "$OUT"
+    emit_event "$(jq -nc --arg t "$TASK" --arg s "$SHA" --arg d "$PAD" \
+        '{schema_version:1,task_id:$t,diff_sha256:$s,reviewer:"codex",verdict:"PASS",findings:[{severity:"P3",title:"pad",file:"a.txt",detail:$d}]}')"
     exit 0
 fi
 # P1-1 회귀: provider 실행 **직전/중에** run 디렉토리를 링크로 바꿔치기한다.
@@ -200,13 +206,13 @@ if [ "${FAKE_MODE:-pass}" = "roruns" ] && [ -n "${CROSS_REVIEW_HOME:-}" ]; then
     done
 fi
 if [ "${FAKE_MODE:-pass}" = "killme" ]; then
-    [ -n "$OUT" ] && fake_emit_body codex "$TASK" "$SHA" > "$OUT"
+    emit_event "$(fake_emit_body codex "$TASK" "$SHA")"
     printf 'emitted\n' > "${FAKE_EMIT_SENTINEL:-/dev/null}"
     sleep 30
     exit 0
 fi
-[ -n "$OUT" ] && fake_emit_body codex "$TASK" "$SHA" > "$OUT"
-# provider 가 예상치 못한 코드로 죽지만 결과 파일은 멀쩡한 상황
+emit_event "$(fake_emit_body codex "$TASK" "$SHA")"
+# provider 가 예상치 못한 코드로 죽지만 결과는 멀쩡한 상황
 [ "${FAKE_MODE:-pass}" = "rc42" ] && exit 42
 exit 0
 FAKE_CODEX
@@ -376,7 +382,7 @@ T1="$(only_task_id "$R1")"
     || fail "X3 attempt=$(state_get "$R1" "$T1" attempt) (기대 1)"
 
 ARGV="$(cat "$FAKE_ARGV_LOG" 2>/dev/null)"
-for needle in -- "--sandbox read-only" "--output-schema" "--output-last-message" "--cd" \
+for needle in -- "--sandbox read-only" "--output-schema" "--json" "--cd" \
               "--ignore-user-config" "--ignore-rules" "--ephemeral"; do
     [ "$needle" = "--" ] && continue
     if printf '%s' "$ARGV" | grep -q -- "$needle"; then
@@ -1486,8 +1492,12 @@ for n in $CR_SCRIPTS; do
     [ -f "$F" ] || MISSING="${MISSING} ${n}"
     [ -x "$F" ] || MISSING="${MISSING} ${n}(noexec)"
 done
+# 결과 스키마는 **데이터 파일**이다. 빠지면 Codex 어댑터가 출력 스키마를 넘기지 못해
+# 모든 리뷰가 BLOCKED 로 끝난다 (live smoke 로 확인한 실패 모드).
+[ -f "${HO}/.claude/hooks/cross-review/result-schema.json" ] \
+    || MISSING="${MISSING} result-schema.json"
 if [ -z "$MISSING" ]; then
-    pass "X26 스크립트 7종(.sh 6 + safe-fs.py) 설치 + 실행권한"
+    pass "X26 스크립트 7종 + result-schema.json 설치 (실행권한 포함)"
 else
     fail "X26 누락/비실행:${MISSING} (log: $(tail -3 "${SANDBOX_ROOT}/ins-h-optin.log" | tr '\n' ' '))"
 fi
