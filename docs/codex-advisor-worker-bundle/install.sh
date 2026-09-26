@@ -1335,14 +1335,24 @@ worker 보고 수신: 가능하면 동기 실행으로 결과를 직접 받는�
 Opus 소진 후 경로는 둘: (a) 두 에이전트의 model: 을 sonnet 으로 임시 하향, (b) /codex:rescue 로 Codex(별도 한도)에 위임.
 
 **상향 경로 — Fable 5 (명시적 opt-in 전용):**
-Agent 도구 model enum 에 `fable` 이 있으나 기본 구성 어디에서도 쓰지 않는다. 단가가 Opus 5 의
-2배($10/$50 per 1M)이므로 자동 승격은 두지 않고, 다음 두 경우에 한해 사용자가 명시적으로 지시할 때만 쓴다:
+Agent 도구 model enum 에 `fable` 이 있으나 기본 구성 어디에서도 쓰지 않는다. 단가가 높으므로
+($10/$50 per 1M — Opus 5 의 2배. Opus 5.5 대비 비율은 미확인) 자동 승격은 두지 않고, 다음 두 경우에 한해 사용자가 명시적으로 지시할 때만 쓴다:
 - 실패 비용이 큰 1회성 최난도 판단 (되돌리기 어려운 마이그레이션 설계, 아키텍처 분기 결정)
 - 감독 없이 오래 도는 장기 자율 실행
-그 외에는 Opus 5 가 기본이다. "어려워 보인다"는 승격 사유가 아니다 — effort 를 먼저 올린다.
+그 외에는 Opus 5.5 가 기본이다. "어려워 보인다"는 승격 사유가 아니다 — effort 를 먼저 올린다.
 
 ## Reasoning effort
-- Claude 기본 high. Codex 검증 effort는 ~/.codex/config.toml 의 model_reasoning_effort 로 조절(high 권장).
+- Opus 5.5 기본은 **medium** — `settings.json` 의 `modelSettings["claude-opus-5-5"]` 에 명시한다.
+  5.5 의 medium 은 Opus 5 의 high 와 같거나 낫다(공식 가이드). 구 모델 기준의 high 를 그대로 옮기지 않는다.
+- 올리는 기준: 파일을 건너뜀·테스트 미실행·다단계 작업 중도 포기처럼 "덜 시도한" 실패가 보이면 high.
+  xhigh 는 30분 이상 장기 자율 작업이나 측정으로 이득이 확인된 작업에만. max 는 세션 한정으로만 쓴다.
+- 생각을 줄일 때는 프롬프트가 아니라 effort 를 낮춘다. 상시 지시문에 "깊이 생각하라" 류 문구를 넣지 않는다
+  (사용자가 요청 단위로 붙이는 ultrathink 는 예외).
+- effort 를 세션 도중 바꾸면 프롬프트 캐시가 무효화된다 — 작업 시작 시 정한다. 부득이 바꿀 때는 저장 기본값을 덮지 않도록
+  `/effort` 슬라이더의 `s`(세션 한정)로 적용한다.
+- 함정: 사용자 settings 의 top-level `effortLevel` 은 Opus 5.5 이후 모델에 적용되지 않는다(Opus 5·Fable 5.1 이전 전용).
+  5.5 레벨은 `modelSettings` 로만 정해진다. 우선순위: `CLAUDE_CODE_EFFORT_LEVEL` > `--effort`/`/effort` > settings > 모델 기본.
+- Codex 검증 effort는 ~/.codex/config.toml 의 model_reasoning_effort 로 조절(high 권장).
 
 ## 토큰 무거운 작업
 **1M 메인이 직접 읽는 것이 기본값이다.** 대량 입력을 analyzer 등에 먼저 위임하는 의무는 폐기했다 —
