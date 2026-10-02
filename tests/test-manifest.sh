@@ -326,4 +326,33 @@ else
 fi
 rm -rf "$N9D"
 
+# UTF-8 로케일의 awk 는 `==`/`!=` 를 collation 으로 비교해 서로 다른 한글 경로를
+# 같다고 본다(실측: '프로젝트별 템플릿.md' 조회가 '실전 예제.md' 해시를 반환).
+# 조회 오매칭은 소유권 오판을, 삭제 오매칭은 남의 항목 유실을 부른다.
+echo "=== N10: 한글 경로는 로케일과 무관하게 바이트 단위로 구분된다 ==="
+N10MF="${D}/n10-manifest.tsv"
+N10A="docs/system-setup/실전 예제.md"
+N10B="docs/system-setup/프로젝트별 템플릿.md"
+(
+    export LC_ALL=en_US.UTF-8
+    manifest_set "$N10MF" "$N10A" "hash-a"
+    # B 는 아직 미등록 — 조회 결과는 비어 있어야 한다
+    printf '%s\n' "$(manifest_get "$N10MF" "$N10B")"
+    manifest_set "$N10MF" "$N10B" "hash-b"
+    manifest_remove "$N10MF" "$N10B"
+    printf '%s\n' "$(manifest_get "$N10MF" "$N10A")"
+) > "${D}/n10.out"
+N10GET="$(sed -n 1p "${D}/n10.out")"
+N10LEFT="$(sed -n 2p "${D}/n10.out")"
+if [ -z "$N10GET" ]; then
+    pass "N10 미등록 한글 경로 조회가 다른 경로의 해시를 반환하지 않음"
+else
+    fail "N10 get 오매칭: 미등록 경로인데 '${N10GET}' 반환"
+fi
+if [ "$N10LEFT" = "hash-a" ]; then
+    pass "N10 set/remove 가 다른 한글 경로 항목을 지우지 않음"
+else
+    fail "N10 set/remove 가 '${N10A}' 항목을 유실함 (남은 값 '${N10LEFT}')"
+fi
+
 finish

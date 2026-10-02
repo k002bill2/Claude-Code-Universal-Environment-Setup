@@ -58,10 +58,12 @@ manifest_path_safe() {
 }
 
 # 특정 relpath 의 기록된 해시 (없으면 빈 문자열)
+# 경로 비교 awk 는 전부 LC_ALL=C — UTF-8 로케일의 awk 는 ==/!= 를 collation 으로
+# 비교해 서로 다른 한글 경로를 같다고 본다(조회 오매칭·남의 항목 삭제, N10).
 manifest_get() {
   local manifest="$1" relpath="$2"
   [ -f "$manifest" ] || return 0
-  awk -F '\t' -v p="$relpath" '$1 == p { v = $2 } END { if (v != "") print v }' "$manifest"
+  LC_ALL=C awk -F '\t' -v p="$relpath" '$1 == p { v = $2 } END { if (v != "") print v }' "$manifest"
 }
 
 # 심볼릭 링크 해석 — dotfiles 로 관리되는 .manifest 를 `mv` 가 일반 파일로
@@ -86,7 +88,7 @@ manifest_set() {
   local tmp
   tmp="$(mktemp "${manifest}.XXXXXX" 2>/dev/null || mktemp)" || return 1
   if [ -f "$manifest" ]; then
-    awk -F '\t' -v p="$relpath" '$1 != p' "$manifest" > "$tmp"
+    LC_ALL=C awk -F '\t' -v p="$relpath" '$1 != p' "$manifest" > "$tmp"
   else
     : > "$tmp"
   fi
@@ -100,7 +102,7 @@ manifest_remove() {
   [ -f "$manifest" ] || return 0
   local tmp
   tmp="$(mktemp "${manifest}.XXXXXX" 2>/dev/null || mktemp)" || return 1
-  awk -F '\t' -v p="$relpath" '$1 != p' "$manifest" > "$tmp"
+  LC_ALL=C awk -F '\t' -v p="$relpath" '$1 != p' "$manifest" > "$tmp"
   mv "$tmp" "$(manifest_resolve_link "$manifest")"
 }
 
