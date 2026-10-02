@@ -8,7 +8,7 @@ tags:
 #claude-code #dev-docs #context-management
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | Opus 4.8 / Fable 5 / Sonnet 5 (1M 컨텍스트) / Haiku 4.5
+> Claude Code: 최신 버전 | Opus / Fable / Sonnet (1M 컨텍스트) / Haiku
 
 > 💡 **Claude = 극도로 자신감 넘치는 주니어 개발자 with 심각한 건망증**
 >
@@ -315,7 +315,7 @@ Keep updates concise but comprehensive!
 컨텍스트 압축 *직전*에 Dev Docs 저장을 알리는 Hook:
 
 ```json
-// .claude/settings.json의 hooks 섹션 (v2.1.210 스키마)
+// .claude/settings.json의 hooks 섹션 (현행 스키마)
 {
   "hooks": {
     "PreCompact": [

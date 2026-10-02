@@ -8,17 +8,17 @@ tags:
 #claude-code #skills #examples
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | 설정: .claude/settings.json
-> Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5
+> Claude Code: 최신 버전 | 설정: .claude/settings.json
+> Models: Opus / Fable / Sonnet / Haiku
 
 ## 📌 개요
 Claude Code Agent Skills의 실제 예시들입니다. 각 Skill은 특정 작업에 특화되어 있으며, 필요에 따라 자동으로 로드됩니다.
 
 > ※ 2026-06-16 갱신: description 기반 자동 로드 외에 **Skill 도구로 명시 호출**도 가능합니다(예: `Skill(skill="code-reviewer")`). 새 스킬은 **skill-creator 스킬**로 생성하고, 빌트인 스킬과 플러그인 스코프 스킬(`ecc:*` 네임스페이스, 예: `ecc:code-review`)이 함께 공존합니다.
 
-### 스킬 캐릭터 버짓 (v2.1.210)
+### 스킬 캐릭터 버짓 (현행)
 - 스킬 콘텐츠는 컨텍스트 윈도우의 **약 2%**까지 자동 스케일링
-- 1M 컨텍스트 (Opus 4.8/Sonnet 5) 기준 약 20K 토큰
+- 1M 컨텍스트 (Opus/Sonnet) 기준 약 20K 토큰
 - SKILL.md 메인 파일은 500줄 이하 권장
 - 추가 내용은 번들 리소스(references/, scripts/, assets/)로 분리
 

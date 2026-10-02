@@ -10,9 +10,9 @@ tags:
 - **Version**: 3.2.0
 - **Last Updated**: 2026-06-16
 - **Status**: Active
-- **Scope**: Multi-agent parallel execution in Claude Code v2.1.210 environment
+- **Scope**: Multi-agent parallel execution in Claude Code 최신 버전 environment
 - **Previous Version**: 3.1.1 (2026-05-16), 3.1.0 (2026-03-18, CLI v2.1.78 기준)
-- **Models**: Opus 4.8 (최신 플래그십, 1M context 변형 존재), Fable 5 (신규 세대), Sonnet 5 (1M context, 코딩/에이전트 메인), Haiku 4.5
+- **Models**: Opus (최신 플래그십), Fable (신규 세대), Sonnet (1M context, 코딩/에이전트 메인), Haiku
 - **Settings**: .claude/settings.json
 
 ---
@@ -41,12 +41,12 @@ tags:
 - **run_in_background**: 백그라운드 에이전트 실행 및 자동 완료 알림
 - **영구 메모리**: 에이전트별 메모리 스코프 (user/project/local)
 
-### 에이전트 Frontmatter (v2.1.210 기준)
+### 에이전트 Frontmatter (현행 기준)
 ```markdown
 ---
 name: agent-name
 description: Agent purpose and trigger conditions
-model: sonnet-5          # opus-4.8, fable-5, sonnet-5, haiku-4.5
+model: sonnet          # 별칭: opus, fable, sonnet, haiku (버전 비고정)
 # effort / maxTurns / disallowedTools 는 환경/버전에 따라 지원 여부 상이.
 # 사용 전 `claude --version`과 /agents 메뉴로 실제 지원 확인 권장.
 ---
@@ -1389,7 +1389,7 @@ Agent(
 # 두 에이전트 모두 완료 시 자동 알림 수신
 ```
 
-### A4. 에이전트 Frontmatter 스펙 (v2.1.210 기준)
+### A4. 에이전트 Frontmatter 스펙 (현행 기준)
 
 ```markdown
 ---
@@ -1397,7 +1397,7 @@ name: agent-name                    # 에이전트 식별자
 description: >-                     # 트리거 조건 + 용도 설명
   Detailed description of when and
   how this agent should be used
-model: sonnet-5                   # opus-4.8, fable-5, sonnet-5, haiku-4.5
+model: sonnet                   # 별칭: opus, fable, sonnet, haiku (버전 비고정)
 tools: Edit, Write, Read, Grep, Glob, Bash    # 사용 가능 도구 (대문자)
 ---
 
@@ -1408,7 +1408,7 @@ tools: Edit, Write, Read, Grep, Glob, Bash    # 사용 가능 도구 (대문자)
 
 **참고**: 이전 버전의 `effort`/`maxTurns`/`disallowedTools` 필드는 환경에 따라 지원 여부가 다릅니다. 새 에이전트 생성 시 `/agents` 메뉴로 실제 지원되는 필드를 확인하세요. `disallowedTools` 대신 `tools` 화이트리스트가 안전한 접근.
 
-### A5. Hooks 전체 이벤트 목록 (v2.1.210 스키마)
+### A5. Hooks 전체 이벤트 목록 (현행 스키마)
 
 ```json
 {
@@ -1460,4 +1460,4 @@ tools: Edit, Write, Read, Grep, Glob, Bash    # 사용 가능 도구 (대문자)
 
 ---
 
-*v3.2.0 업데이트: 2026-06-16 | Claude Code v2.1.210 | Opus 4.8 (1M context 변형) / Fable 5 / Sonnet 5 (1M context) / Haiku 4.5*
+*v3.2.0 업데이트: 2026-06-16 | Claude Code 최신 버전 | Opus (1M context) / Fable / Sonnet (1M context) / Haiku*

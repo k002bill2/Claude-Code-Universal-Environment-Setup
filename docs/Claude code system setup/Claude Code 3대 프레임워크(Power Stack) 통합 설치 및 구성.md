@@ -7,7 +7,7 @@ tags:
 # 🚀 [가이드] Claude Code 3대 프레임워크(Power Stack) 활용 가이드
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5
+> Claude Code: 최신 버전 | Models: Opus / Fable / Sonnet / Haiku
 > **중요한 변화**: 이전 버전(2026-03)에서는 수동 설치 가이드였으나, 이후 세 프레임워크는 스킬 형태로 제공되어 **설치되어 있다면** 스킬 호출만으로 사용 가능합니다(즉, 설치 여부 확인이 선행되어야 함 — 아래 경고 참조).
 
 > ⚠️ **설치 여부 먼저 확인**: `superpowers:*` 계열은 이 환경에서 기본 사용 가능하지만, **GSD(`gsd:*`)와 Gstack(`gstack-*`)은 이 환경에 기본 설치되어 있지 않습니다**(현재 available-skills에는 `superpowers:*`만 존재). `/help` 또는 시스템 프롬프트의 available-skills에서 실제 설치 여부를 **먼저** 확인하세요.
@@ -189,4 +189,4 @@ touch .gsd/states/current_state.md
 
 ---
 
-*이 문서는 Claude Code v2.1.210 (2026-07 기준) 환경을 가정합니다. 스킬 목록은 `/help` 또는 시스템 프롬프트에서 항상 최신 상태로 확인하세요.*
+*이 문서는 Claude Code 최신 버전 환경을 가정합니다. 스킬 목록은 `/help` 또는 시스템 프롬프트에서 항상 최신 상태로 확인하세요.*

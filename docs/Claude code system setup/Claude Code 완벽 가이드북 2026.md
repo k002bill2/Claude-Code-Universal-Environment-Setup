@@ -9,7 +9,7 @@ tags:
 
 > 작성일: 2026-05-16 (재최신화, 기존: 2026-03-18)
 > 환경: macOS (VS Code, Cursor 등 호환)
-> Claude Code: v2.1.210 | Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5
+> Claude Code: 최신 버전 | Models: Opus / Fable / Sonnet / Haiku
 > Claude Code 경험: 초보자 ~ 중급자용
 
 ## 📌 개요
@@ -58,7 +58,7 @@ Claude Code는 Anthropic이 개발한 터미널 기반 AI 코딩 도구로, 2026
 
 ### 5. Background Tasks & Hooks ⚙️
 - **백그라운드**: Ctrl+B로 프로세스 실행
-- **Hooks 종류** (v2.1.210 전체 목록):
+- **Hooks 종류** (현행 전체 목록):
   - PreToolUse: 도구 사용 전
   - PostToolUse: 도구 사용 후
   - **PostToolUseFailure**: 도구 실행 실패 시
@@ -174,7 +174,7 @@ brew install git
 # npm을 통한 설치
 npm install -g @anthropic-ai/claude-code
 
-# 버전 확인 (2026-07 기준 최신: v2.1.210)
+# 버전 확인 (최신 유지: claude update)
 claude --version
 
 # 실행 및 로그인
@@ -279,13 +279,13 @@ def review_checklist():
 # 4. Select color for visual identification
 ```
 
-#### 3.2 Frontend Specialist Agent 예시 (v2.1.210 형식)
+#### 3.2 Frontend Specialist Agent 예시 (현행 형식)
 ```markdown
 ---
 name: frontend-specialist
 description: React/Next.js component development, optimization, and testing
 tools: Edit, Write, Read, Grep, Glob, Bash
-model: sonnet-5
+model: sonnet
 # 참고: effort/maxTurns/disallowedTools는 환경별 지원 차이가 있어 권장 X.
 # 대신 tools 화이트리스트로 제한하는 것이 안전합니다.
 ---
@@ -329,7 +329,7 @@ const Component: React.FC<ComponentProps> = ({ ...props }) => {
 - Minimum 80% code coverage
 ```
 
-#### 3.3 내장 에이전트 타입 (v2.1.210, 플랫 빌트인 + 플러그인 스코프 공존)
+#### 3.3 내장 에이전트 타입 (현행, 플랫 빌트인 + 플러그인 스코프 공존)
 | 타입 | 용도 |
 |------|------|
 | `general-purpose` | 범용 작업 (기본) |
@@ -603,19 +603,19 @@ claude-in-chrome, Figma, Canva, Atlassian, Notion, Slack, Gmail, Google(Calendar
 
 ## 📦 프로젝트 타입별 Skills & Agents
 
-### 모델 선택 가이드 (2026-06 기준)
+### 모델 선택 가이드
 
 | 모델             | 컨텍스트   | 용도              | 속도     | 비용     |
 | -------------- | ------ | --------------- | ------ | ------ |
-| **Haiku 4.5**  | 200K   | 간단한 작업, 빠른 반복   | 🚀🚀🚀 | 💰     |
-| **Sonnet 5** | **1M** | 일반 개발, 코딩, 에이전트 | 🚀🚀   | 💰💰   |
-| **Opus 4.8**   | **1M** | 복잡한 추론, 엔터프라이즈, 최신 플래그십 | 🚀 | 💰💰💰 |
-| **Fable 5**    | **1M** | 가장 까다로운 추론·장기 에이전트 작업 (최대 출력 128K) | 🚀 | 💰💰💰💰 |
+| **Haiku**  | 200K   | 간단한 작업, 빠른 반복   | 🚀🚀🚀 | 💰     |
+| **Sonnet** | **1M** | 일반 개발, 코딩, 에이전트 | 🚀🚀   | 💰💰   |
+| **Opus**   | **1M** | 복잡한 추론, 엔터프라이즈, 최신 플래그십 | 🚀 | 💰💰💰 |
+| **Fable**    | **1M** | 가장 까다로운 추론·장기 에이전트 작업 (최대 출력 128K) | 🚀 | 💰💰💰💰 |
 
-> **모델 ID**: `claude-haiku-4-5-20251001`, `claude-sonnet-5`, `claude-opus-4-8`, `claude-fable-5`
-> **가격(per MTok, API 기준)**: Fable 5 input $10 / output $50, Opus 4.8 $5 / $25, Sonnet 5 $3 / $15 (2026-08-31까지 인트로 $2 / $10), Haiku 4.5 $1 / $5. Fable 5는 Opus-tier보다 비싸므로(2배) "가장 까다로운 작업"에만 권장.
-> **1M 컨텍스트**: Max/Team/Enterprise 플랜에서 Opus 4.8, Sonnet 5 사용 시 최대 1M 토큰 컨텍스트 지원 (Opus 4.8은 1M 컨텍스트 변형 존재). Fable 5도 1M(기본=최대) 지원.
-> **변경 이력**: 2026-03 Opus 4.6 → 2026-05 Opus 4.7 → 2026-06 Opus 4.8 (플래그십). Fable 5 신규 세대 추가. Sonnet/Haiku는 유지.
+> **모델 지정**: 별칭 `opus` / `sonnet` / `haiku` / `fable` 을 쓰면 항상 해당 계열의 현행 모델로 해석된다. 전체 모델 ID·컨텍스트는 [공식 모델 개요](https://platform.claude.com/docs/en/about-claude/models/overview) 참조.
+> **가격**: 상대 비용은 Fable > Opus > Sonnet > Haiku. Fable 은 "가장 까다로운 작업"에만 권장. 현행 단가는 [공식 가격표](https://platform.claude.com/docs/en/about-claude/pricing) 참조.
+> **1M 컨텍스트**: Opus·Sonnet·Fable 계열은 1M 토큰 컨텍스트 지원 (플랜별 제한은 공식 문서 확인). Haiku 계열은 200K.
+> **변경 이력**: 2026-03 Opus 4.6 → 2026-05 Opus 4.7 → 2026-06 Opus 4.8 (플래그십). Fable 5 신규 세대 추가. Sonnet/Haiku는 유지. (과거 기록 — 이후 문서는 버전을 고정하지 않고 별칭을 쓴다)
 
 ### Effort 레벨 가이드
 | 레벨 | 용도 | 사용 예 |
@@ -693,7 +693,7 @@ ls .claude/skills/
 7. **Effort 조절**: 작업 복잡도에 맞게 `/effort` 조절
 8. **Fast 모드**: 간단한 작업은 `/fast`로 빠르게 처리
 
-### 주요 명령어 (v2.1.210)
+### 주요 명령어 (현행)
 | 명령어 | 설명 |
 |--------|------|
 | `/clear` | 컨텍스트 초기화 |
@@ -701,7 +701,7 @@ ls .claude/skills/
 | `/agents` | Sub-agents 관리 |
 | `/model` | 모델 변경 |
 | `/effort` | effort 레벨 설정 (환경별 지원 차이) |
-| `/fast` | 빠른 모드 토글 (Opus 4.8/4.7 지원 — 작은 모델로 다운그레이드가 아니라 Opus를 빠른 출력으로 실행) |
+| `/fast` | 빠른 모드 토글 (Opus 지원 — 작은 모델로 다운그레이드가 아니라 Opus를 빠른 출력으로 실행) |
 | `/memory` | 메모리 관리 |
 | `/branch` | 세션 분기 (/fork 대체) |
 | `/copy N` | N번째 응답 복사 |
@@ -796,7 +796,7 @@ ls .claude/skills/
 ## 🎓 학습 로드맵
 
 ### Week 1: 기초
-- [ ] Claude Code 설치 및 설정 (현재 v2.1.210)
+- [ ] Claude Code 설치 및 설정 (최신 버전)
 - [ ] 기본 명령어 익히기 (/effort, /fast, /compact, /loop, /schedule)
 - [ ] 첫 CLAUDE.md 작성
 - [ ] 간단한 코드 생성 테스트
