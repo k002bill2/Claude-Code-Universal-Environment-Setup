@@ -2643,6 +2643,35 @@ else
 fi
 
 # ============================================================================
+# X69: diff 동결 실패가 명령치환 안에서도 잡힌다 (PIPESTATUS 회귀)
+# ============================================================================
+echo "=== X69: 읽기 불가 untracked 의 동결 실패 ==="
+# 읽을 수 없는 untracked 파일이 있으면 rs_emit_diff 는 출력 없이 1 을 낸다.
+# CUR="$(emit | sha)" 뒤의 PIPESTATUS 는 대입문 상태라 0 이 되고, 빈 diff 해시와
+# 같아져 조용히 exit 0 하던 길이다. fail-closed 로 BLOCKED_ERROR 를 남겨야 한다.
+R69="$(mk_repo)"
+git -C "$R69" add -A >/dev/null 2>&1
+git -C "$R69" -c commit.gpgsign=false commit -q -m base >/dev/null 2>&1
+printf 'unreviewed\n' > "${R69}/locked.txt"
+chmod 000 "${R69}/locked.txt"
+if [ -r "${R69}/locked.txt" ]; then
+    skip "X69 chmod 000 이 읽기를 막지 못함(root?) — 재현 불가"
+else
+    printf '{"stop_hook_active":false,"cwd":"%s"}' "$R69" \
+        | bash "$STOP_GUARD" > "${SANDBOX_ROOT}/x69.log" 2>&1
+    RC=$?
+    [ "$RC" -eq 0 ] && pass "X69 exit 0 (세션 차단 아님)" || fail "X69 exit ${RC} (기대 0)"
+    T69="$(only_task_id "$R69")"
+    [ "$(state_get "$R69" "$T69" phase)" = "BLOCKED_ERROR" ] \
+        && pass "X69 phase=BLOCKED_ERROR (동결 실패를 통과로 보지 않음)" \
+        || fail "X69 phase=$(state_get "$R69" "$T69" phase) — 동결 실패가 빈 diff 로 묻힘"
+    [ "$(state_get "$R69" "$T69" reason)" = "freeze_failed" ] \
+        && pass "X69 reason=freeze_failed" \
+        || fail "X69 reason=$(state_get "$R69" "$T69" reason)"
+fi
+chmod 644 "${R69}/locked.txt"
+
+# ============================================================================
 # X31: 실제 $HOME 무오염 (스위트 전체의 격리 증거)
 # ============================================================================
 echo "=== X31: 실 HOME 무오염 ==="
