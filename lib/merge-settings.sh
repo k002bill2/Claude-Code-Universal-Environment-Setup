@@ -513,7 +513,7 @@ msf_render_merged() {
 msf_records_owned_by_others() {
   local manifest="$1" id="$2"
   [ -f "$manifest" ] || return 0
-  awk -F '\t' -v id="$id" 'NF >= 2 && $1 != id {
+  LC_ALL=C awk -F '\t' -v id="$id" 'NF >= 2 && $1 != id {
       line = $2
       for (i = 3; i <= NF; i++) line = line "\t" $i
       print line
@@ -538,7 +538,7 @@ msf_manifest_records() {
   local manifest="$1" id="$2"
   [ -f "$manifest" ] || return 0
   # 첫 필드가 정확히 id 인 줄만. awk 로 탭 필드 분해(경로에 공백 있어도 안전).
-  awk -F '\t' -v id="$id" 'NF >= 2 && $1 == id {
+  LC_ALL=C awk -F '\t' -v id="$id" 'NF >= 2 && $1 == id {
       line = $2
       for (i = 3; i <= NF; i++) line = line "\t" $i
       print line
@@ -549,7 +549,7 @@ msf_manifest_records() {
 msf_manifest_without() {
   local manifest="$1" id="$2"
   [ -f "$manifest" ] || return 0
-  awk -F '\t' -v id="$id" 'NF >= 1 && $1 != id { print }' "$manifest"
+  LC_ALL=C awk -F '\t' -v id="$id" 'NF >= 1 && $1 != id { print }' "$manifest"
 }
 
 # ──────────────────────────────────────────────────────────────────────
