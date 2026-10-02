@@ -115,8 +115,10 @@ TASK="${CROSS_REVIEW_TASK_ID:-}"
 # diff 를 썼다. mktemp 는 생성만 안전하게 하고 그 파일을 고정하지 못하므로, 같은 UID 의
 # 다른 프로세스가 `>` 직전에 그것을 링크로 바꿔치기하면 동결 diff(소스 전문)가 링크
 # 너머로 새고 링크 대상이 truncate 됐다. 이제 스트림에서 바로 해시한다.
-CUR="$(rs_emit_diff "$WT" "$SCOPE" "$BASE" | rs_sha256_stdin)"
-EMIT_RC="${PIPESTATUS[0]:-0}"
+# PIPESTATUS 는 명령치환 서브셸 안에서만 유효하다 — 바깥에서 읽으면 대입문의 상태(0)라
+# 동결 실패가 빈 diff 해시로 묻힌다(X69). 서브셸이 emit 의 rc 로 끝나게 해서 넘긴다.
+CUR="$(rs_emit_diff "$WT" "$SCOPE" "$BASE" | rs_sha256_stdin; exit "${PIPESTATUS[0]}")"
+EMIT_RC=$?
 [ "$EMIT_RC" -eq 0 ] \
     || guard_block freeze_failed "diff 동결에 실패했습니다. 통과로 간주하지 않습니다."
 
