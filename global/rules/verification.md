@@ -44,3 +44,18 @@
 | 요구사항 충족 | 항목별 체크리스트 검증 |
 
 자신감·"될 거예요"·만족 표현은 증거가 아니다. 검증 명령 출력만이 증거다.
+
+## 브라우저 검증 도구 (2026-09-15 사용자 지시)
+
+브라우저 런타임 검증은 **ego-browser(Ego Lite)** 또는 **aside repl** 로만 한다.
+**Playwright·Puppeteer 를 설치하지 않는다** — 저장소는 물론 스크래치패드에 임시로 까는 것도 금지.
+`claude-in-chrome`(mcp) 도 쓰지 않는다(전역 deny).
+
+- 기본: `ego-browser nodejs <<'EOF' … EOF` (Playwright 아님 — 문서화된 TaskSpace/Page API만 사용).
+- **뷰포트 폭 변경**은 ego-browser 의 CDP 이스케이프 해치로 한다. aside repl 에는 `setViewportSize` 가 없다:
+  ```js
+  await page.cdp('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false });
+  // 끝나면 await page.cdp('Emulation.clearDeviceMetricsOverride', {});
+  ```
+  `window.open`(팝업 차단)·`html{zoom}`(미디어쿼리 미반영)은 뷰포트 대체가 못 된다 — 둘 다 실측 실패.
+- 간단한 DOM 조회·클릭 한두 번이면 `aside repl` 도 무방하다. 여러 폭·여러 route 루프는 ego-browser.
