@@ -1334,24 +1334,20 @@ worker 보고 수신: 가능하면 동기 실행으로 결과를 직접 받는�
 모드 B는 소진 "대비" 절약책이지 소진 "후" 대책이 아니다 — 모드 B에서도 architect·worker는 그대로 opus를 호출한다.
 Opus 소진 후 경로는 둘: (a) 두 에이전트의 model: 을 sonnet 으로 임시 하향, (b) /codex:rescue 로 Codex(별도 한도)에 위임.
 
-**상향 경로 — Fable 5 (명시적 opt-in 전용):**
-Agent 도구 model enum 에 `fable` 이 있으나 기본 구성 어디에서도 쓰지 않는다. 단가가 높으므로
-($10/$50 per 1M — Opus 5 의 2배. Opus 5.5 대비 비율은 미확인) 자동 승격은 두지 않고, 다음 두 경우에 한해 사용자가 명시적으로 지시할 때만 쓴다:
+**상향 경로 — Fable 5 (명시적 opt-in 전용, $10/$50 per 1M — Opus 5 의 2배):** 자동 승격 없음. 다음 두 경우에 사용자가 명시적으로 지시할 때만:
 - 실패 비용이 큰 1회성 최난도 판단 (되돌리기 어려운 마이그레이션 설계, 아키텍처 분기 결정)
 - 감독 없이 오래 도는 장기 자율 실행
 그 외에는 Opus 5.5 가 기본이다. "어려워 보인다"는 승격 사유가 아니다 — effort 를 먼저 올린다.
 
 ## Reasoning effort
-- Opus 5.5 기본은 **medium** — `settings.json` 의 `modelSettings["claude-opus-5-5"]` 에 명시한다.
-  5.5 의 medium 은 Opus 5 의 high 와 같거나 낫다(공식 가이드). 구 모델 기준의 high 를 그대로 옮기지 않는다.
+- Opus 5.5 기본은 **medium** — `settings.json` 의 `modelSettings["claude-opus-5-5"]` 에 명시한다. 구 모델 기준의 high 를 옮기지 않는다.
 - 올리는 기준: 파일을 건너뜀·테스트 미실행·다단계 작업 중도 포기처럼 "덜 시도한" 실패가 보이면 high.
   xhigh 는 30분 이상 장기 자율 작업이나 측정으로 이득이 확인된 작업에만. max 는 세션 한정으로만 쓴다.
 - 생각을 줄일 때는 프롬프트가 아니라 effort 를 낮춘다. 상시 지시문에 "깊이 생각하라" 류 문구를 넣지 않는다
   (사용자가 요청 단위로 붙이는 ultrathink 는 예외).
-- effort 를 세션 도중 바꾸면 프롬프트 캐시가 무효화된다 — 작업 시작 시 정한다. 부득이 바꿀 때는 저장 기본값을 덮지 않도록
-  `/effort` 슬라이더의 `s`(세션 한정)로 적용한다.
-- 함정: 사용자 settings 의 top-level `effortLevel` 은 Opus 5.5 이후 모델에 적용되지 않는다(Opus 5·Fable 5.1 이전 전용).
-  5.5 레벨은 `modelSettings` 로만 정해진다. 우선순위: `CLAUDE_CODE_EFFORT_LEVEL` > `--effort`/`/effort` > settings > 모델 기본.
+- 세션 도중 변경은 캐시를 무효화한다 — 작업 시작 시 정하고, 부득이하면 `/effort` 의 `s`(세션 한정)로.
+- 함정: top-level `effortLevel` 은 Opus 5.5 이후 모델에 적용되지 않는다 — 5.5 레벨은 `modelSettings` 로만.
+  우선순위: `CLAUDE_CODE_EFFORT_LEVEL` > `--effort`/`/effort` > settings > 모델 기본.
 - Codex 검증 effort는 ~/.codex/config.toml 의 model_reasoning_effort 로 조절(high 권장).
 
 ## 토큰 무거운 작업
@@ -1364,19 +1360,15 @@ Agent 도구 model enum 에 `fable` 이 있으나 기본 구성 어디에서도 
 (1M 창 = +550k, 200k 창 = +40k — 아래 티어 참조).
 컨텍스트 경고(CONTEXT BUDGET WARNING / CONTEXT BUDGET CRITICAL)가 주입되면 즉시:
 1. 진행 중 작업을 자연스러운 지점에서 마무리
-2. 상태 저장 — 분기 조건은 STATE.md 가 아니라 **미완료 plan 의 실존**이다.
-   `/gsd:pause-work` 는 `.planning/phases/<phase>/*-PLAN.md` 를 찾아 동작하며 STATE.md 를 읽지 않는다.
-   미완료 판정은 GSD 관례대로 **대응 `*-SUMMARY.md` 부재**다 — plan 이 전부 SUMMARY 를 가진 phase 는
-   완료된 것이라, 보내면 끝난 phase 의 핸드오프를 만들거나 빈 손으로 phase 를 되묻는다:
-   - `.planning/phases/<phase>/` 에 대응 `*-SUMMARY.md` 없는 `*-PLAN.md` 있음 → `/gsd:pause-work`
+2. 상태 저장 — 분기 기준은 STATE.md 가 아니라 **미완료 plan(대응 `*-SUMMARY.md` 없는 `*-PLAN.md`)의 실존**이다
+   (`/gsd:pause-work` 는 PLAN 을 찾아 동작하며 STATE.md 를 읽지 않는다):
+   - `.planning/phases/<phase>/` 에 미완료 plan 있음 → `/gsd:pause-work`
    - 그 외(전부 완료 포함) `.planning/STATE.md` 있음 → STATE.md 의 `Current Position`·`Session Continuity` 갱신
-   - 둘 다 없음 → HANDOFF.md 작성(설계 결정·완료 기준·검증 상태·다음 단계)
-   코드가 더러우면 `/wip-save` 병행
-3. 새 세션을 권고한다 (compact 보다 우선 — 무엇을 남길지 조언자가 직접 고를 수 있다)
-저장 포맷을 새로 만들지 않는다. 위 경로 중 하나를 쓴다.
+   - 둘 다 없음 → HANDOFF.md 작성(설계 결정·완료 기준·검증 상태·다음 단계). 코드가 더러우면 `/wip-save` 병행
+3. 새 세션을 권고한다 (compact 보다 우선). 저장 포맷을 새로 만들지 않는다.
 경고는 예산 소진(세션 시작 대비 델타)과 컨텍스트 창 사용률을 함께 표시한다.
 둘은 다른 지표다 — 창에 여유가 있어도 예산을 넘으면 정지 대상이다.
-기준은 델타(토큰)이되 임계치는 창 크기에 비례하며, 비율은 **창 티어별로 다르다**:
+임계치는 창 크기에 비례하며 **창 티어별로 다르다**:
 - 소형 창(< 500k): WARNING 15% / CRITICAL 20% — 200k 창 = +30k / +40k
 - 대형 창(>= 500k): WARNING 40% / CRITICAL 55% — 1M 창 = +400k / +550k
 창 크기를 모를 때(브리지 window 필드 부재)는 200k 로 폴백해 소형 티어를 적용한다 — 모르면 보수적으로.
