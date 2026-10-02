@@ -1,5 +1,5 @@
 ---
-# 출처: docs/Claude code system setup/프로젝트별 템플릿.md (model: opus-4.8 → 별칭 opus로 정규화)
+# 출처: docs/Claude code system setup/프로젝트별 템플릿.md (model: 별칭 opus — 출처와 동일)
 name: api-architect
 description: Design and implement scalable API architectures
 tools: Edit, Write, Read, Grep, Glob, Bash

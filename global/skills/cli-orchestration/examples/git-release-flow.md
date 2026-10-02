@@ -169,7 +169,7 @@ release_commit:
         - Bump version to 2.1.0
         - Update CHANGELOG.md
 
-        Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+        Co-Authored-By: Claude <noreply@anthropic.com>"
 
     - command: "git push origin release/2.1.0"
 ```

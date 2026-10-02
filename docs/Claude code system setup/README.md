@@ -9,7 +9,7 @@ tags:
 > **최신 업데이트**: 2026-06-16 갱신 (이전 2026-05-16, 2026-03-18에서 재최신화)
 > **환경**: macOS (VS Code, Cursor 등)
 > **대상**: Claude Code 초보자 ~ 중급자
-> **CLI 버전**: v2.1.210 | **모델**: Opus 4.8 / Fable 5 / Sonnet 5 (1M 컨텍스트) / Haiku 4.5
+> **CLI 버전**: 최신 (`claude update`) | **모델**: Opus / Fable / Sonnet (1M 컨텍스트) / Haiku
 
 ---
 
@@ -84,18 +84,18 @@ tags:
 
 ### Claude Code란?
 - Anthropic의 AI 기반 터미널 코딩 도구
-- 2026년 7월 기준 최신 버전: **v2.1.210** (3월 v2.1.78에서 132 patch 진행)
+- 버전은 `claude --version` 으로 확인하고 `claude update` 로 최신을 유지한다 (문서는 특정 버전을 고정하지 않음)
 - Agent Skills, Sub-agents, Hooks, **플러그인**, **메모리**, **Plan Mode**, **공식 스킬 프레임워크(GSD/Superpowers/Gstack)** 등 강력한 기능 제공
-- **Opus 4.8 / Fable 5 / Sonnet 5** 모델 지원 (**1M 컨텍스트**), Haiku 4.5는 200K 컨텍스트
+- Opus / Fable / Sonnet 계열은 1M 컨텍스트, Haiku 계열은 200K 컨텍스트 (현행 수치는 공식 모델 문서 확인)
 
-| 모델 | ID | 컨텍스트 | 비고 |
+| 모델 | 별칭 | 컨텍스트 | 비고 |
 |------|-----|---------|------|
-| **Opus 4.8** | `claude-opus-4-8` | 1M 변형 존재 | 플래그십 |
-| **Fable 5** | `claude-fable-5` | — | 신규 세대 |
-| **Sonnet 5** | `claude-sonnet-5` | 1M | — |
-| **Haiku 4.5** | `claude-haiku-4-5-20251001` | 200K | 경량 |
+| **Opus** | `opus` | 1M | 플래그십 |
+| **Fable** | `fable` | 1M | 최상위 추론 |
+| **Sonnet** | `sonnet` | 1M | — |
+| **Haiku** | `haiku` | 200K | 경량 |
 
-> `/fast` 모드는 Opus 4.8/4.7을 지원합니다. 작은 모델로 다운그레이드하는 것이 아니라, Opus를 빠른 출력으로 실행합니다.
+> `/fast` 모드는 Opus 계열을 지원합니다. 작은 모델로 다운그레이드하는 것이 아니라, Opus를 빠른 출력으로 실행합니다.
 
 ### 필수 4대 시스템
 1. **Skills + 플러그인**: Hook 기반 활성화 + 플러그인 마켓플레이스
@@ -152,7 +152,7 @@ tags:
 ## 🎯 학습 로드맵
 
 ### Week 1: 기초 다지기
-- [ ] Claude Code v2.1.210 설치 및 설정
+- [ ] Claude Code 최신 버전 설치 및 설정
 - [ ] 기본 명령어 익히기 (/effort, /fast, /compact, /loop, /schedule 포함)
 - [ ] 첫 CLAUDE.md 작성
 
@@ -208,7 +208,7 @@ tags:
 - VS Code, Cursor 등 에디터
 
 ### 권장
-- Claude Code CLI **v2.1.210** 이상 (2026-07 기준)
+- Claude Code CLI 최신 버전 (`claude update`)
 - TypeScript 5.5+
 - Next.js 15+ (웹 개발시)
 - Docker (백엔드 개발시)
@@ -245,7 +245,7 @@ tags:
 
 **Happy Coding with Claude Code! 🚀**
 
-*마지막 업데이트: 2026-07-15 갱신 (이전 2026-05-16)*
-*환경: macOS | Claude Code v2.1.210 | Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5*
+*마지막 업데이트: 2026-10-03 갱신 (이전 2026-05-16)*
+*환경: macOS | Claude Code 최신 버전 | Opus / Fable / Sonnet / Haiku*
 
 #claude-code #ai-coding #guide #macos

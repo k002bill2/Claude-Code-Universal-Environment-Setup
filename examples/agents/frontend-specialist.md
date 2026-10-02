@@ -1,5 +1,5 @@
 ---
-# 출처: docs/Claude code system setup/Claude Code 완벽 가이드북 2026.md (model: sonnet-5 → 별칭 sonnet으로 정규화)
+# 출처: docs/Claude code system setup/Claude Code 완벽 가이드북 2026.md (model: 별칭 sonnet — 출처와 동일)
 name: frontend-specialist
 description: React/Next.js component development, optimization, and testing
 tools: Edit, Write, Read, Grep, Glob, Bash

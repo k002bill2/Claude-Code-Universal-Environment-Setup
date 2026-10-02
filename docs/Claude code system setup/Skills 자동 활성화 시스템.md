@@ -8,8 +8,8 @@ tags:
 #claude-code #skills #hooks #실전팁
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | 설정: .claude/settings.json
-> Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5
+> Claude Code: 최신 버전 | 설정: .claude/settings.json
+> Models: Opus / Fable / Sonnet / Haiku
 
 > 💡 **문제**: Claude가 Skills를 만들어놔도 실제로 사용하지 않는 경우가 있음
 >
@@ -19,7 +19,7 @@ tags:
 
 ## 🎯 개요
 
-### v2.1.210 현황
+### 현행 현황
 - **네이티브 자동 활성화 (기본값)**: 세션 시작 시 시스템이 사용 가능한 스킬 목록을 자동 제공하고, 모델이 작업 맥락에 맞는 스킬을 스스로 인식·호출. 명시적으로 부르고 싶으면 `Skill` 도구로 직접 트리거. → **일상 사용의 약 80%가 여기서 해결됨**.
 - **개선점**: 스킬 자동 인식 및 Progressive Disclosure 성능이 v2.0.x 대비 크게 향상. `superpowers:using-superpowers`처럼 세션 시작 시 강제 호출되는 메타 스킬도 사용률을 추가로 끌어올림.
 - **캐릭터 버짓**: 컨텍스트의 약 2%까지 스킬 콘텐츠 자동 스케일링 (1M 컨텍스트 = ~20K 토큰)
@@ -323,7 +323,7 @@ Consider using the auto-error-resolver agent.
 
 ## 🎨 Skills 재구성 (캐릭터 버짓 준수)
 
-### 캐릭터 버짓 (v2.1.210 기준)
+### 캐릭터 버짓 (현행 기준)
 - 스킬 콘텐츠는 컨텍스트 윈도우의 **약 2%**까지 자동 스케일링
 - 1M 컨텍스트 기준 약 20K 토큰 (매우 넉넉)
 - 그래도 Progressive Disclosure 원칙 유지 권장
@@ -435,7 +435,7 @@ Component.displayName = 'Component';
 mkdir -p .claude/hooks .claude/skills
 ```
 
-### 2. Hooks 설정 (.claude/settings.json) — v2.1.210 스키마
+### 2. Hooks 설정 (.claude/settings.json) — 현행 스키마
 
 > ⚠️ **실배선은 bash 훅만**: 아래 예시는 L108의 TypeScript 스켈레톤(`node ...js`)이 아니라 **실제로 동작하는 bash 훅**만 배선합니다. UserPromptSubmit 은 정본 `skill-activator.sh`, PreCompact 는 `pre-compact-reminder.sh` (둘 다 `claude_code_setup_prompt.md` STEP 6 / `install.sh` 산출물). Stop·PostToolUseFailure 같은 추가 이벤트가 필요하면 **실행 가능한 스크립트를 먼저 작성한 뒤** 같은 형식으로 배선하세요(위 TS 예시는 개념용이라 `node ...js` 로 그대로 배선하면 무동작).
 

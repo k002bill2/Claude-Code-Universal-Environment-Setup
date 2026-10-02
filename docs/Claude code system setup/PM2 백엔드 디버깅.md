@@ -8,8 +8,8 @@ tags:
 #claude-code #pm2 #debugging #backend
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | 설정: .claude/settings.json
-> Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5
+> Claude Code: 최신 버전 | 설정: .claude/settings.json
+> Models: Opus / Fable / Sonnet / Haiku
 
 > 💡 **문제**: 7개 마이크로서비스 동시 실행, Claude가 로그 못 봄
 >
@@ -483,6 +483,6 @@ Remember: All services auto-restart on crash.
 
 *"Make debugging bearable with PM2"*
 
-*마지막 업데이트: 2026-07-15 | Claude Code v2.1.210 | Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5*
+*마지막 업데이트: 2026-10-03 | Claude Code 최신 버전 | Opus / Fable / Sonnet / Haiku*
 
 #pm2 #microservices #debugging #backend

@@ -9,7 +9,7 @@ tags:
 
 > 최종 업데이트: 2026-07-15 (이전: 2026-03-21)
 > Boris Cherny 원칙 기반: "Claude가 추측할 수 없는 것만 넣어라"
-> 대상 환경: Claude Code v2.1.210 (Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5)
+> 대상 환경: Claude Code 최신 버전 (Opus / Fable / Sonnet / Haiku)
 
 ## 핵심 원칙
 

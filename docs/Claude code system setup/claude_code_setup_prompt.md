@@ -42,11 +42,11 @@ your-project/
 2. pseudocode / TypeScript 예시 코드는 "구현 참조용"이므로 실제 파일로 생성하지 마라
 3. 모든 파일 생성 전 디렉토리가 없으면 먼저 생성하라
 4. 완료 후 반드시 생성된 파일 목록과 구조를 보고하라
-5. 모델 string은 문서의 표기와 무관하게 실제 API string을 사용하라 (※ 2026-06-16 갱신):
-   - opus → claude-opus-4-8              # 최신 플래그십 (1M 컨텍스트 변형 존재)
-   - fable → claude-fable-5             # 신규 세대
-   - sonnet → claude-sonnet-5          # 코딩/에이전트 메인 (1M)
-   - haiku → claude-haiku-4-5-20251001   # 경량/빠른 반복 (200K)
+5. 모델은 버전을 고정하지 말고 별칭을 사용하라 (전체 API ID 하드코딩 금지 — 별칭은 항상 현행 모델로 해석됨):
+   - opus                    # 플래그십 (현행 Opus 계열로 해석)
+   - fable                   # 최상위 추론 (현행 Fable 계열)
+   - sonnet                  # 코딩/에이전트 메인 (1M)
+   - haiku                   # 경량/빠른 반복 (200K)
 6. Hook command는 bash 스크립트(.sh)로 작성하라 (node/ts 아님)
 7. settings.json은 하나의 파일에 모든 시스템의 hooks를 통합하라
 
@@ -122,7 +122,7 @@ hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 �
 **파일**: `.claude/agents/primary-coordinator.md`
 **근거**: 문서 Section 3.1 + Section 2.5 (Agent Hierarchy) + Appendix A4
 **frontmatter**:
-- model: claude-opus-4-8
+- model: opus
 - effort: high
 - maxTurns: 50
 - disallowedTools: ["Bash(rm -rf *)", "Bash(sudo *)"]
@@ -140,7 +140,7 @@ hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 �
 **파일**: `.claude/agents/code-explorer.md`
 **근거**: 문서 내장 에이전트 타입 `Explore`/`general-purpose` (v3.1.0의 `feature-dev:code-explorer` 대체) + Section 3.2
 **frontmatter**:
-- model: claude-sonnet-5
+- model: sonnet
 - effort: medium
 - maxTurns: 30
 - disallowedTools: ["Bash(rm *)", "Bash(sudo *)", "Write"]
@@ -155,7 +155,7 @@ hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 �
 **파일**: `.claude/agents/code-reviewer.md`
 **근거**: 문서 내장 에이전트 타입 `code-reviewer` (v3.1.0의 `feature-dev:code-reviewer` 대체) + Section 3.2
 **frontmatter**:
-- model: claude-sonnet-5
+- model: sonnet
 - effort: high
 - maxTurns: 30
 - disallowedTools: ["Bash(rm *)", "Bash(sudo *)"]
@@ -170,7 +170,7 @@ hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 �
 **파일**: `.claude/agents/verify-agent.md`
 **근거**: 문서 내장 에이전트 타입 `verify-agent` + Section 8 (Validation and QA)
 **frontmatter**:
-- model: claude-sonnet-5
+- model: sonnet
 - effort: high
 - maxTurns: 20
 - disallowedTools: ["Bash(rm *)", "Bash(sudo *)"]
@@ -186,7 +186,7 @@ hooks 섹션은 아래 3개 시스템을 모두 통합 (2026-05 기준 유효 �
 **파일**: `.claude/agents/code-architect.md`
 **근거**: 문서 내장 에이전트 타입 `architect` (v3.1.0의 `feature-dev:code-architect` 대체)
 **frontmatter**:
-- model: claude-opus-4-8
+- model: opus
 - effort: high
 - maxTurns: 40
 - disallowedTools: ["Bash(rm -rf *)", "Bash(sudo *)"]
@@ -646,7 +646,7 @@ dev/
   현재 Claude Code 버전에서 지원 여부를 먼저 확인하고, 미지원 시 주석으로 표시할 것
 - settings.json의 hooks command는 반드시 실행 가능한 경로를 사용할 것
 - hook 스크립트(.sh)에 반드시 chmod +x 실행 권한 부여
-- agent frontmatter의 model string은 실제 API string 기준으로 작성
+- agent frontmatter의 model 은 별칭(opus/fable/sonnet/haiku)으로 작성 (버전 고정 금지)
 - Dev Docs 명령어의 $ARGUMENTS는 Claude Code가 자동으로 치환하는 변수임
 - jq가 설치되지 않은 환경에서도 skill-activator.sh가 에러 없이 동작하도록 방어 처리
 ```
@@ -711,5 +711,5 @@ your-project/
 ---
 
 *Generated for: Parallel Agents Safety Protocol v3.1.0 + Skills Activation + Dev Docs*
-*Claude Code v2.1.210 (2026-07 기준) 환경 | 통합 시스템 v1.1*
-*Models: Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5*
+*Claude Code 최신 버전 환경 | 통합 시스템 v1.1*
+*Models: Opus / Fable / Sonnet / Haiku*

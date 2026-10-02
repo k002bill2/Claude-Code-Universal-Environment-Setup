@@ -17,7 +17,7 @@ node --version
 # 2. Claude Code CLI 설치
 npm install -g @anthropic-ai/claude-code
 
-# 3. 버전 확인 (2026-07 기준 최신: v2.1.210)
+# 3. 버전 확인 (최신 유지: claude update)
 claude --version
 
 # 4. 로그인
@@ -68,7 +68,7 @@ my-project/
 └── PRD.md                       # 프로젝트 요구사항
 ```
 
-## 🎮 주요 명령어 (v2.1.210)
+## 🎮 주요 명령어 (현행)
 
 ### 기본 명령어
 | 명령어 | 설명 | 사용 예시 |
@@ -80,7 +80,7 @@ my-project/
 | `/agents` | Sub-agents 관리 | agent 생성/수정 |
 | `/model` | 모델 변경 | sonnet/opus/haiku |
 | `/effort` | effort 레벨 설정 | low/medium/high |
-| `/fast` | 빠른 모드 토글 | Opus 4.8/4.7에서 출력 가속 (작은 모델로 다운그레이드 X) |
+| `/fast` | 빠른 모드 토글 | Opus에서 출력 가속 (작은 모델로 다운그레이드 X) |
 | `/help` | 도움말 | 명령어 목록 확인 |
 | `/bug` | 버그 리포트 | 문제 발생 시 |
 
@@ -214,14 +214,14 @@ EOF
 # 5. Choose color
 ```
 
-### 수동 생성 (v2.1.210 형식)
+### 수동 생성 (현행 형식)
 ```markdown
 # .claude/agents/specialist.md
 ---
 name: specialist
 description: Specializes in specific tasks
 tools: Edit, Write, Read, Grep, Glob, Bash
-model: sonnet-5
+model: sonnet
 # 참고: effort/maxTurns/disallowedTools는 환경별 지원 차이가 있어 권장 X.
 # tools 화이트리스트가 안전한 도구 제한 방법.
 ---
@@ -322,14 +322,14 @@ You are a specialist in...
 
 | 모델 | 컨텍스트 | 용도 | 속도 | 비용 |
 |------|----------|------|------|------|
-| **Haiku 4.5** | 200K | 간단한 작업, 빠른 반복 | 🚀🚀🚀 | 💰 |
-| **Sonnet 5** | **1M** | 일반 개발, 코딩, 에이전트 | 🚀🚀 | 💰💰 |
-| **Opus 4.8** | **1M** | 복잡한 추론, 엔터프라이즈, 최신 플래그십 (1M 컨텍스트 변형 존재) | 🚀 | 💰💰💰 |
-| **Fable 5** | **1M** | 가장 까다로운 추론·장기 에이전트 작업 (최대 출력 128K) | 🚀 | 💰💰💰💰 |
+| **Haiku** | 200K | 간단한 작업, 빠른 반복 | 🚀🚀🚀 | 💰 |
+| **Sonnet** | **1M** | 일반 개발, 코딩, 에이전트 | 🚀🚀 | 💰💰 |
+| **Opus** | **1M** | 복잡한 추론, 엔터프라이즈, 최신 플래그십 | 🚀 | 💰💰💰 |
+| **Fable** | **1M** | 가장 까다로운 추론·장기 에이전트 작업 (최대 출력 128K) | 🚀 | 💰💰💰💰 |
 
-> 모델 ID: `claude-opus-4-8`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5-20251001`
-> 가격(per MTok): Fable 5 $10/$50, Opus 4.8 $5/$25, Sonnet 5 $3/$15 (2026-08-31까지 인트로 $2/$10), Haiku 4.5 $1/$5
-> 변경 이력: 2026-03 시점 Opus 4.6 → 2026-05 Opus 4.7 → 2026-06 Opus 4.8 (※ 2026-06-16 갱신)
+> 모델 지정: 별칭 `opus` / `sonnet` / `haiku` / `fable` (항상 현행 모델로 해석). 전체 ID는 [공식 모델 개요](https://platform.claude.com/docs/en/about-claude/models/overview)
+> 가격: 상대 비용 Fable > Opus > Sonnet > Haiku. 현행 단가는 [공식 가격표](https://platform.claude.com/docs/en/about-claude/pricing)
+> 변경 이력: 2026-03 시점 Opus 4.6 → 2026-05 Opus 4.7 → 2026-06 Opus 4.8 (과거 기록 — 이후 문서는 버전을 고정하지 않는다)
 
 ## 🔗 필수 링크
 
@@ -341,7 +341,7 @@ You are a specialist in...
 
 ---
 
-*빠른 참조를 위한 체크리스트. 마지막 업데이트: 2026-07-15*
-*환경: macOS (VS Code, Cursor 호환) | Claude Code v2.1.210 | Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5*
+*빠른 참조를 위한 체크리스트. 마지막 업데이트: 2026-10-03*
+*환경: macOS (VS Code, Cursor 호환) | Claude Code 최신 버전 | Opus / Fable / Sonnet / Haiku*
 
 #quick-reference #cheatsheet #claude-code

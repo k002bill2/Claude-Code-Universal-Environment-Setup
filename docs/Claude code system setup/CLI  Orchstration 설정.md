@@ -8,14 +8,14 @@ tags:
 #claude-code #orchestration #multi-agent #cli
 
 > 최종 업데이트: 2026-07-15
-> Claude Code: v2.1.210 | 설정: .claude/settings.json
-> Models: Opus 4.8 (claude-opus-4-8, 1M 변형 존재) / Fable 5 (claude-fable-5) / Sonnet 5 (claude-sonnet-5, 1M) / Haiku 4.5 (claude-haiku-4-5-20251001)
+> Claude Code: 최신 버전 | 설정: .claude/settings.json
+> Models: 별칭 opus / fable / sonnet / haiku (버전 비고정 — 현행 모델로 해석)
 > ※ 2026-06-16 갱신: 플래그십이 Opus 4.8로 갱신되고 신규 세대 Fable 5 추가. `/fast` 모드는 Opus 4.8/4.7을 작은 모델로 다운그레이드하지 않고 Opus 그대로 빠른 출력으로 실행.
 
 ## 🎯 개요
 
 CLI Orchestration은 여러 에이전트를 조율하여 복잡한 작업을 자동화하는 시스템입니다.
-Claude Code v2.1.210은 `cli-orchestrator`와 `Primary Coordinator` 내장 에이전트를 제공합니다.
+Claude Code 최신 버전은 `cli-orchestrator`와 `Primary Coordinator` 내장 에이전트를 제공합니다.
 
 ## 📋 내장 오케스트레이션 에이전트
 
@@ -219,6 +219,6 @@ Compile findings into a comprehensive report"
 ---
 
 *CLI Orchestration은 복잡한 워크플로우를 자동화하는 강력한 도구입니다.*
-*마지막 업데이트: 2026-07-15 | Claude Code v2.1.210 | Opus 4.8 / Fable 5 / Sonnet 5 / Haiku 4.5*
+*마지막 업데이트: 2026-10-03 | Claude Code 최신 버전 | Opus / Fable / Sonnet / Haiku*
 
 #orchestration #multi-agent #cli #automation

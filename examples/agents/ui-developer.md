@@ -1,5 +1,5 @@
 ---
-# 출처: docs/Claude code system setup/프로젝트별 템플릿.md (model: sonnet-5 → 별칭 sonnet으로 정규화)
+# 출처: docs/Claude code system setup/프로젝트별 템플릿.md (model: 별칭 sonnet — 출처와 동일)
 name: ui-developer
 description: Frontend UI development with React and design system implementation
 tools: Edit, Write, Read, Grep, Glob, Bash
