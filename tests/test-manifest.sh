@@ -344,15 +344,22 @@ N10B="docs/system-setup/프로젝트별 템플릿.md"
 ) > "${D}/n10.out"
 N10GET="$(sed -n 1p "${D}/n10.out")"
 N10LEFT="$(sed -n 2p "${D}/n10.out")"
-if [ -z "$N10GET" ]; then
-    pass "N10 미등록 한글 경로 조회가 다른 경로의 해시를 반환하지 않음"
+# 카나리아: UTF-8 로케일이 없어 C 로 떨어지면(또는 awk 가 collation 을 안 쓰면)
+# 수정을 되돌려도 통과한다 — 그 환경에서는 통과가 아니라 SKIP 으로 드러낸다.
+if ! LC_ALL=en_US.UTF-8 awk -v a="$N10A" -v b="$N10B" \
+        'BEGIN { exit !(a == b) }' 2>/dev/null; then
+    skip "N10 en_US.UTF-8 로케일에서 collation 오매칭이 재현되지 않음 — 회귀 검출 불가 환경"
 else
-    fail "N10 get 오매칭: 미등록 경로인데 '${N10GET}' 반환"
-fi
-if [ "$N10LEFT" = "hash-a" ]; then
-    pass "N10 set/remove 가 다른 한글 경로 항목을 지우지 않음"
-else
-    fail "N10 set/remove 가 '${N10A}' 항목을 유실함 (남은 값 '${N10LEFT}')"
+    if [ -z "$N10GET" ]; then
+        pass "N10 미등록 한글 경로 조회가 다른 경로의 해시를 반환하지 않음"
+    else
+        fail "N10 get 오매칭: 미등록 경로인데 '${N10GET}' 반환"
+    fi
+    if [ "$N10LEFT" = "hash-a" ]; then
+        pass "N10 set/remove 가 다른 한글 경로 항목을 지우지 않음"
+    else
+        fail "N10 set/remove 가 '${N10A}' 항목을 유실함 (남은 값 '${N10LEFT}')"
+    fi
 fi
 
 finish
