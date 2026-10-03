@@ -119,7 +119,8 @@ BACKUP_MAP=""
 BACKUP_TAB="$(printf '\t')"
 
 backup_lookup() {
-  printf '%s' "${BACKUP_MAP}" | awk -F"${BACKUP_TAB}" -v t="$1" '$1 == t { print $2; exit }'
+  # LC_ALL=C: UTF-8 로케일 awk 의 == 는 collation 비교라 서로 다른 한글 경로를 같다고 본다
+  printf '%s' "${BACKUP_MAP}" | LC_ALL=C awk -F"${BACKUP_TAB}" -v t="$1" '$1 == t { print $2; exit }'
 }
 
 # 대상 파일이 존재하고 비어 있지 않으면 <파일>.bak.<UTC타임스탬프> 로 복사 후 진행.

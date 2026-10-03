@@ -528,4 +528,35 @@ expect_hook "셸 확장 인접: rm -rf /\$EMPTY" \
 expect_hook "오탐 금지(확장): rm -rf /tmp/\$BUILD" \
     "$G_BASH" '{"tool_input":{"command":"rm -rf /tmp/$BUILD"}}' 0
 
+# ── F10: advisor 번들 backup_lookup — 한글 경로 collation 오매칭 ─────────
+# UTF-8 로케일 awk 의 `==` 는 서로 다른 한글 경로를 같다고 본다(lib/manifest.sh N10
+# 과 같은 결함). 오매칭이면 처음 보는 대상이 '이미 백업됨'으로 판정돼 설치 전
+# 원본 백업이 생략된다. 함수 정의만 뽑아 실제 코드를 그대로 평가한다.
+echo "=== F10: advisor 번들 backup_lookup 은 한글 경로를 바이트 단위로 구분 ==="
+ADV_INSTALL="${REPO_DIR}/docs/codex-advisor-worker-bundle/install.sh"
+F10_DEF="$(sed -n '/^backup_lookup() {$/,/^}$/p' "$ADV_INSTALL")"
+# 카나리아: 이 환경의 UTF-8 로케일이 실제로 오매칭을 재현해야 테스트가 의미 있다.
+# 로케일이 없어 C 로 떨어지거나(collation 없음) awk 구현이 다르면 수정을 되돌려도
+# 통과하므로, 그때는 통과가 아니라 SKIP 으로 드러낸다.
+if ! LC_ALL=en_US.UTF-8 awk -v a="/h/실전 예제.md" -v b="/h/프로젝트별 템플릿.md" \
+        'BEGIN { exit !(a == b) }' 2>/dev/null; then
+    skip "F10 en_US.UTF-8 로케일에서 collation 오매칭이 재현되지 않음 — 회귀 검출 불가 환경"
+elif [ -z "$F10_DEF" ]; then
+    fail "F10 backup_lookup 정의를 찾지 못함 — 테스트 헛돎"
+else
+    F10_GOT="$(
+        export LC_ALL=en_US.UTF-8
+        BACKUP_TAB="$(printf '\t')"
+        BACKUP_MAP="/h/실전 예제.md${BACKUP_TAB}/h/실전 예제.md.bak
+"
+        eval "$F10_DEF"
+        backup_lookup "/h/프로젝트별 템플릿.md"
+    )"
+    if [ -z "$F10_GOT" ]; then
+        pass "F10 미백업 한글 경로가 다른 경로의 백업으로 오매칭되지 않음"
+    else
+        fail "F10 backup_lookup 오매칭: 미백업 경로인데 '${F10_GOT}' 반환"
+    fi
+fi
+
 finish
