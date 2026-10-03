@@ -1509,8 +1509,8 @@ install_global() {
         name="$(basename "$d")"
         install_managed_dir "$d" "${CLAUDE_HOME}/skills/${name}" "~/.claude/skills/${name}/"
     done
-    # 글로벌 에이전트. cli-orchestration 스킬이 cli-orchestrator/cli-worker 를 전제로
-    # 쓰고 있는데 페이로드에 없어서, 설치만 하면 스킬이 없는 에이전트를 가리켰다.
+    # 글로벌 에이전트. 2026-10-03 cli-orchestrator/cli-worker 폐기로 현재 페이로드는 비어
+    # 있지만, 이전 설치본을 스윕으로 정리하고 향후 에이전트를 배포하는 경로라 유지한다.
     # 주의: 조언자 번들(docs/codex-advisor-worker-bundle/install.sh)이 만드는
     # architect/worker/analyzer/researcher 는 manifest 에 기록되지 않는다 — 스윕은
     # manifest 항목만 순회하므로 그 4종을 건드리지 않는다.

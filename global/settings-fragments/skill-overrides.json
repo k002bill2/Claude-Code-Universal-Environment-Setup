@@ -2,7 +2,6 @@
   "skillOverrides": {
     "agent-improvement": "off",
     "agent-observability": "off",
-    "cli-orchestration": "user-invocable-only",
     "computer-use": "user-invocable-only",
     "external-memory": "user-invocable-only",
     "find-skills": "user-invocable-only",
