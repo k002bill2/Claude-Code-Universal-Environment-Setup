@@ -116,6 +116,16 @@ g switch feat/current
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
 expect_line "G27 공백만 다른 브랜치는 KEEP" '^KEEP +local +feat/ws '
 
+# ── 반복 블록: 위치만 다른 같은 변경은 squash 머지가 아니다 (patch-id 는 행 번호 무시) ──
+g switch main
+rep_file() { awk -v at="$1" 'BEGIN{for(i=1;i<=20;i++){print "x"; if(i==at) print "ADD"}}' > "$W/rep.txt"; }
+rep_file 0; g add rep.txt; g commit -m "rep base"; g push origin main
+g switch -c feat/rep; rep_file 15; g commit -am "add at line 15"
+g switch main;        rep_file 5;  g commit -am "add at line 5"; g push origin main
+g switch feat/current
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+expect_line "G30 위치만 다른 동일 변경은 KEEP" '^KEEP +local +feat/rep '
+
 # ── 현재 브랜치의 원격도 보호 ───────────────────────────────────────────
 g push origin feat/current
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"

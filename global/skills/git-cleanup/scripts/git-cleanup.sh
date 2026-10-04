@@ -14,9 +14,10 @@
 #   ACTION = DELETE | REMOVE | PRUNE | KEEP,  KIND = local | remote | worktree
 #
 # "머지됨" 판정 (하나라도 참이면 내용 손실 없음):
-#   1. 기준 브랜치의 ancestor          2. 트리가 기준과 동일
-#   3. 브랜치 순변경의 patch-id 가 기준의 커밋 하나와 일치 (squash 머지)
+#   1. 기준 브랜치의 ancestor          2. tree OID 가 기준과 동일
+#   3. 기준에 merge-tree 로 머지해도 기준 tree 가 그대로 (squash 머지 — git 2.38+)
 #   4. gh: 이 브랜치 tip 을 head 로 하는 PR 이 MERGED
+# 삭제는 분류 시점 SHA 를 조건으로 한다 (로컬 update-ref -d, 원격 lease).
 # 보호: 기준 브랜치·main·master·develop·현재 브랜치·dirty/locked 워크트리 브랜치.
 # ============================================================================
 set -u
@@ -63,6 +64,7 @@ fi
 BASE_REF="$BASE_NAME"
 git rev-parse -q --verify "refs/remotes/${REMOTE}/${BASE_NAME}" >/dev/null && BASE_REF="${REMOTE}/${BASE_NAME}"
 git rev-parse -q --verify "$BASE_REF" >/dev/null || { echo "기준 ref 없음: $BASE_REF" >&2; exit 2; }
+BASE_TREE="$(git rev-parse "$BASE_REF^{tree}")"
 
 CURRENT="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
@@ -82,27 +84,20 @@ is_protected() {
     return 1
 }
 
-# 기준 이후 커밋들의 patch-id 집합 (merge-base 별로 다르므로 호출마다 계산)
-# --verbatim: 기본 patch-id 는 공백을 무시해 'a b' 와 'ab' 를 같은 패치로 본다
-base_patch_ids() {
-    git log --no-merges -p "$1..$BASE_REF" 2>/dev/null | git patch-id --verbatim | cut -d' ' -f1
-}
-
 # merged_reason <ref> <branch-name> → 머지 사유 출력 후 0, 아니면 1
 merged_reason() {
-    local ref="$1" name="$2" mb pid num
+    local ref="$1" name="$2" merged num
     if git merge-base --is-ancestor "$ref" "$BASE_REF" 2>/dev/null; then
         echo "merged (ancestor of ${BASE_REF})"; return 0
     fi
-    if git diff --quiet "$BASE_REF" "$ref" 2>/dev/null; then
+    # tree OID 직접 비교 — git diff 는 diff.ignoreSubmodules 설정에 따라 변경을 숨긴다
+    if [ "$(git rev-parse "$ref^{tree}")" = "$BASE_TREE" ]; then
         echo "tree identical to ${BASE_REF}"; return 0
     fi
-    mb="$(git merge-base "$BASE_REF" "$ref" 2>/dev/null)"
-    if [ -n "$mb" ]; then
-        pid="$(git diff "$mb" "$ref" | git patch-id --verbatim | cut -d' ' -f1)"
-        if [ -n "$pid" ] && base_patch_ids "$mb" | grep -qx "$pid"; then
-            echo "squash-merged (patch-id matches ${BASE_REF})"; return 0
-        fi
+    # patch-id 는 공백·행 위치를 무시해 오탐한다. 실제 3-way 머지 결과로 판정한다.
+    merged="$(git merge-tree --write-tree "$BASE_REF" "$ref" 2>/dev/null | head -1)"
+    if [ -n "$merged" ] && [ "$merged" = "$BASE_TREE" ]; then
+        echo "squash-merged (merging into ${BASE_REF} is a no-op)"; return 0
     fi
     if [ "$USE_GH" = 1 ]; then
         num="$(gh pr list --state merged --head "$name" --limit 20 \
@@ -150,7 +145,7 @@ wt_flush() {
         elif reason="$(merged_reason "refs/heads/$wt_branch" "$wt_branch")"; then
             row REMOVE worktree "$wt_path" "clean, branch ${wt_branch} ${reason}"
             WT_REMOVE_BRANCHES="${WT_REMOVE_BRANCHES}${wt_branch} "
-            WT_PATHS_REMOVE="${WT_PATHS_REMOVE}${wt_path}
+            WT_PATHS_REMOVE="${WT_PATHS_REMOVE}$(git rev-parse "refs/heads/$wt_branch") ${wt_branch} ${wt_path}
 "
         else
             row KEEP worktree "$wt_path" "branch ${wt_branch} $(unmerged_reason "refs/heads/$wt_branch")"
@@ -174,6 +169,7 @@ $(git worktree list --porcelain)
 EOF
 
 # ── 로컬 브랜치 ─────────────────────────────────────────────────────────
+LOCAL_DEL=""       # "<name> <분류 시점 SHA>"
 for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
     case "$WT_KEEP_BRANCHES" in *" $b "*) continue ;; esac
     case "$WT_REMOVE_BRANCHES" in *" $b "*) row DELETE local "$b" "after worktree removal"; continue ;; esac
@@ -181,6 +177,8 @@ for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
         continue
     elif reason="$(merged_reason "refs/heads/$b" "$b")"; then
         row DELETE local "$b" "$reason"
+        LOCAL_DEL="${LOCAL_DEL}${b} $(git rev-parse "refs/heads/$b")
+"
     else
         row KEEP local "$b" "$(unmerged_reason "refs/heads/$b")"
     fi
@@ -215,15 +213,25 @@ printf '%s' "$ROWS"
 # ── apply ───────────────────────────────────────────────────────────────
 echo "# applying"
 FAILED=0
-run() { echo "+ $*"; "$@" || { echo "! 실패: $*" >&2; FAILED=1; }; }
+run() { echo "+ $*"; "$@" && return 0; echo "! 실패: $*" >&2; FAILED=1; return 1; }
 
 if printf '%s' "$ROWS" | grep -q '^PRUNE '; then run git worktree prune; fi
-printf '%s' "$WT_PATHS_REMOVE" | while IFS= read -r p; do
-    [ -n "$p" ] && run git worktree remove "$p"     # --force 금지: dirty 면 git 이 거부
-done
-for b in $(printf '%s' "$ROWS" | awk '$1=="DELETE" && $2=="local" {print $3}'); do
-    run git branch -D "$b"      # 위에서 머지 검증 완료 — squash 는 -d 가 거부하므로 -D
-done
+# 분류 이후 HEAD 가 움직인 워크트리는 건너뛴다. --force 금지: dirty 면 git 이 거부.
+while read -r sha b p; do
+    [ -n "$sha" ] || continue
+    if [ "$(git -C "$p" rev-parse HEAD 2>/dev/null)" != "$sha" ]; then
+        echo "! 분류 이후 변경됨 — 건너뜀: $p" >&2; FAILED=1; continue
+    fi
+    run git worktree remove "$p" && run git update-ref -d "refs/heads/$b" "$sha"
+done <<EOF
+$WT_PATHS_REMOVE
+EOF
+# update-ref -d <old>: 분류 이후 tip 이 바뀌었으면 git 이 거부 (squash 는 branch -d 가 거부하므로 사용)
+while read -r b sha; do
+    [ -n "$b" ] && run git update-ref -d "refs/heads/$b" "$sha"
+done <<EOF
+$LOCAL_DEL
+EOF
 if [ "$DO_REMOTE" = 1 ]; then
     if [ "$FETCH_FAILED" = 1 ]; then
         echo "! fetch 실패 — 원격 상태를 확인할 수 없어 원격 삭제를 건너뜀" >&2; FAILED=1

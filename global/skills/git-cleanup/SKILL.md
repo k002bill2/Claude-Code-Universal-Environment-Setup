@@ -6,7 +6,7 @@ argument-hint: "[--remote] [--base <branch>]"
 
 # git-cleanup — 머지된 브랜치·워크트리 정리
 
-`git branch --merged` 는 squash 머지를 못 잡는다. 이 스킬의 스크립트는 ancestor·트리 동일·patch-id·gh PR(MERGED, head SHA 일치) 4가지로 "내용 손실 없음"을 판정하고, 그 판정을 통과한 것만 지운다.
+`git branch --merged` 는 squash 머지를 못 잡는다. 이 스킬의 스크립트는 ancestor·tree OID 동일·merge-tree 무변화(squash)·gh PR(MERGED, head SHA 일치) 4가지로 "내용 손실 없음"을 판정하고, 그 판정을 통과한 것만 지운다.
 
 ```bash
 S=~/.claude/skills/git-cleanup/scripts/git-cleanup.sh
@@ -29,9 +29,9 @@ bash "$S" --help               # 옵션: --base, GIT_CLEANUP_NO_GH 등
 
 | ACTION | 의미 | apply 동작 |
 |---|---|---|
-| `DELETE local` | 머지 확인된 로컬 브랜치 | `git branch -D` |
+| `DELETE local` | 머지 확인된 로컬 브랜치 | `git update-ref -d <ref> <분류 시점 SHA>` — 그 사이 tip 이 바뀌면 거부 |
 | `DELETE remote` | 머지 확인된 원격 브랜치 | `--remote` 일 때만 삭제. 분류 시점 SHA 로 lease — 그 사이 push 가 있으면 거부, fetch 실패 시 건너뜀 |
-| `REMOVE worktree` | clean + 머지된 브랜치의 워크트리 | `git worktree remove` (no `--force`) 후 브랜치 삭제 |
+| `REMOVE worktree` | clean + 머지된 브랜치의 워크트리 | HEAD 가 분류 시점 SHA 일 때만 `git worktree remove` (no `--force`) 후 브랜치 삭제 |
 | `PRUNE worktree` | 디렉토리가 사라진 워크트리 | `git worktree prune` |
 | `KEEP` | 미머지·dirty·locked·detached | 건드리지 않음 |
 
@@ -41,5 +41,5 @@ bash "$S" --help               # 옵션: --base, GIT_CLEANUP_NO_GH 등
 
 - `KEEP` 을 지우려면 사용자가 브랜치를 지정해 명시적으로 요청해야 한다. 스크립트에 강제 옵션은 없다.
 - `~/.claude` 처럼 작업 트리가 곧 라이브 환경인 레포에서는 `apply` 전에 현재 브랜치를 옮기지 않는다.
-- git 2.39+ 필요 (`patch-id --verbatim` — 공백만 다른 패치를 같은 것으로 보지 않기 위함).
+- git 2.38+ 필요 (`merge-tree --write-tree`). patch-id 는 공백·행 위치를 무시해 오탐하므로 쓰지 않는다.
 - 기준이 `origin/HEAD` 가 아니면 `--base <branch>` 로 지정한다.
