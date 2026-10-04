@@ -108,6 +108,33 @@ g switch -c feat/current main
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
 reject_line "G25 현재 브랜치는 DELETE 아님" '^DELETE +local +feat/current '
 
+# ── 공백만 다른 패치는 squash 머지로 오인하지 않는다 (patch-id 기본은 공백 무시) ──
+g switch main
+g switch -c feat/ws; commit_file ws.txt 'print("a b")' "ws"
+g switch main; commit_file ws.txt 'print("ab")' "ws on main"; g push origin main
+g switch feat/current
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+expect_line "G27 공백만 다른 브랜치는 KEEP" '^KEEP +local +feat/ws '
+
+# ── 현재 브랜치의 원격도 보호 ───────────────────────────────────────────
+g push origin feat/current
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+reject_line "G28 현재 브랜치의 원격은 DELETE 아님" '^DELETE +remote +origin/feat/current '
+
+# ── 분류 후 원격 tip 이 바뀌면 원격 삭제 거부 (lease) ───────────────────
+g switch main
+g switch -c feat/raced; g push origin feat/raced; g switch main
+OTHER="${SANDBOX_ROOT}/other"
+git clone -q -b feat/raced "$REMOTE" "$OTHER" 2>/dev/null
+echo new > "$OTHER/new.txt"; git -C "$OTHER" add new.txt >/dev/null 2>&1
+git -C "$OTHER" commit -qm "new work" >/dev/null 2>&1; git -C "$OTHER" push -q origin feat/raced >/dev/null 2>&1
+(cd "$W" && GIT_CLEANUP_NO_FETCH=1 bash "$SCRIPT" apply --remote >/dev/null 2>&1)
+if [ "$(git -C "$REMOTE" rev-parse refs/heads/feat/raced 2>/dev/null)" = "$(git -C "$OTHER" rev-parse HEAD)" ]; then
+    pass "G29 원격 tip 변경 시 lease 로 삭제 거부"
+else
+    fail "G29 검증 안 된 원격 커밋이 삭제됨"
+fi
+
 # ── git 레포 밖에서는 실패 ──────────────────────────────────────────────
 (cd "$SANDBOX_ROOT" && bash "$SCRIPT" scan >/dev/null 2>&1) \
     && fail "G26 레포 밖에서 exit 0" || pass "G26 레포 밖에서 non-zero exit"

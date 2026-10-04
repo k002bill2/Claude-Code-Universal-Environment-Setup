@@ -30,15 +30,16 @@ bash "$S" --help               # 옵션: --base, GIT_CLEANUP_NO_GH 등
 | ACTION | 의미 | apply 동작 |
 |---|---|---|
 | `DELETE local` | 머지 확인된 로컬 브랜치 | `git branch -D` |
-| `DELETE remote` | 머지 확인된 원격 브랜치 | `--remote` 일 때만 `git push <remote> --delete` |
+| `DELETE remote` | 머지 확인된 원격 브랜치 | `--remote` 일 때만 삭제. 분류 시점 SHA 로 lease — 그 사이 push 가 있으면 거부, fetch 실패 시 건너뜀 |
 | `REMOVE worktree` | clean + 머지된 브랜치의 워크트리 | `git worktree remove` (no `--force`) 후 브랜치 삭제 |
 | `PRUNE worktree` | 디렉토리가 사라진 워크트리 | `git worktree prune` |
 | `KEEP` | 미머지·dirty·locked·detached | 건드리지 않음 |
 
-보호 대상: 기준 브랜치, `main`/`master`/`develop`, 현재 체크아웃 브랜치, 메인 워크트리.
+보호 대상: 기준 브랜치, `main`/`master`/`develop`, 현재 체크아웃 브랜치(와 그 원격), 메인 워크트리.
 
 ## 주의
 
 - `KEEP` 을 지우려면 사용자가 브랜치를 지정해 명시적으로 요청해야 한다. 스크립트에 강제 옵션은 없다.
 - `~/.claude` 처럼 작업 트리가 곧 라이브 환경인 레포에서는 `apply` 전에 현재 브랜치를 옮기지 않는다.
+- git 2.39+ 필요 (`patch-id --verbatim` — 공백만 다른 패치를 같은 것으로 보지 않기 위함).
 - 기준이 `origin/HEAD` 가 아니면 `--base <branch>` 로 지정한다.

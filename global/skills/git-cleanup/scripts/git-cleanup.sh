@@ -41,8 +41,11 @@ REMOTE="${GIT_CLEANUP_REMOTE:-origin}"
 HAS_REMOTE=0
 git remote get-url "$REMOTE" >/dev/null 2>&1 && HAS_REMOTE=1
 
+FETCH_FAILED=0
 if [ "$HAS_REMOTE" = 1 ] && [ "${GIT_CLEANUP_NO_FETCH:-0}" != 1 ]; then
-    git fetch --prune --quiet "$REMOTE" 2>/dev/null || echo "WARN fetch 실패 — 로컬 ref 기준으로 진행" >&2
+    if ! git fetch --prune --quiet "$REMOTE" 2>/dev/null; then
+        FETCH_FAILED=1; echo "WARN fetch 실패 — 로컬 ref 기준으로 진행 (원격 삭제는 하지 않음)" >&2
+    fi
 fi
 
 # ── 기준 브랜치 ─────────────────────────────────────────────────────────
@@ -62,6 +65,7 @@ git rev-parse -q --verify "refs/remotes/${REMOTE}/${BASE_NAME}" >/dev/null && BA
 git rev-parse -q --verify "$BASE_REF" >/dev/null || { echo "기준 ref 없음: $BASE_REF" >&2; exit 2; }
 
 CURRENT="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
 TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
 USE_GH=0
@@ -79,8 +83,9 @@ is_protected() {
 }
 
 # 기준 이후 커밋들의 patch-id 집합 (merge-base 별로 다르므로 호출마다 계산)
+# --verbatim: 기본 patch-id 는 공백을 무시해 'a b' 와 'ab' 를 같은 패치로 본다
 base_patch_ids() {
-    git log --no-merges -p "$1..$BASE_REF" 2>/dev/null | git patch-id --stable | cut -d' ' -f1
+    git log --no-merges -p "$1..$BASE_REF" 2>/dev/null | git patch-id --verbatim | cut -d' ' -f1
 }
 
 # merged_reason <ref> <branch-name> → 머지 사유 출력 후 0, 아니면 1
@@ -94,7 +99,7 @@ merged_reason() {
     fi
     mb="$(git merge-base "$BASE_REF" "$ref" 2>/dev/null)"
     if [ -n "$mb" ]; then
-        pid="$(git diff "$mb" "$ref" | git patch-id --stable | cut -d' ' -f1)"
+        pid="$(git diff "$mb" "$ref" | git patch-id --verbatim | cut -d' ' -f1)"
         if [ -n "$pid" ] && base_patch_ids "$mb" | grep -qx "$pid"; then
             echo "squash-merged (patch-id matches ${BASE_REF})"; return 0
         fi
@@ -182,13 +187,19 @@ for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
 done
 
 # ── 원격 브랜치 ─────────────────────────────────────────────────────────
+REMOTE_DEL=""      # "<name> <분류 시점 SHA>" — 삭제 lease 용
 if [ "$HAS_REMOTE" = 1 ]; then
     for r in $(git for-each-ref --format='%(refname:short)' "refs/remotes/${REMOTE}/"); do
         name="${r#"${REMOTE}"/}"
         case "$name" in HEAD|"$REMOTE") continue ;; esac
         case "$name" in "$BASE_NAME"|main|master|develop) continue ;; esac
+        # 현재 브랜치(및 그 upstream)의 원격은 작업 중일 수 있다
+        { [ -n "$CURRENT" ] && [ "$name" = "$CURRENT" ]; } && continue
+        [ "$r" = "$UPSTREAM" ] && continue
         if reason="$(merged_reason "refs/remotes/$r" "$name")"; then
             row DELETE remote "$r" "$reason"
+            REMOTE_DEL="${REMOTE_DEL}${name} $(git rev-parse "refs/remotes/$r")
+"
         else
             row KEEP remote "$r" "$(unmerged_reason "refs/remotes/$r")"
         fi
@@ -214,9 +225,16 @@ for b in $(printf '%s' "$ROWS" | awk '$1=="DELETE" && $2=="local" {print $3}'); 
     run git branch -D "$b"      # 위에서 머지 검증 완료 — squash 는 -d 가 거부하므로 -D
 done
 if [ "$DO_REMOTE" = 1 ]; then
-    for r in $(printf '%s' "$ROWS" | awk '$1=="DELETE" && $2=="remote" {print $3}'); do
-        run git push "$REMOTE" --delete "${r#"${REMOTE}"/}"
-    done
+    if [ "$FETCH_FAILED" = 1 ]; then
+        echo "! fetch 실패 — 원격 상태를 확인할 수 없어 원격 삭제를 건너뜀" >&2; FAILED=1
+    else
+        # lease: 분류한 SHA 와 원격 tip 이 다르면 git 이 거부 (그 사이 push 된 커밋 보호)
+        while read -r name sha; do
+            [ -n "$name" ] && run git push "--force-with-lease=refs/heads/${name}:${sha}" "$REMOTE" ":refs/heads/${name}"
+        done <<EOF
+$REMOTE_DEL
+EOF
+    fi
 elif printf '%s' "$ROWS" | grep -q '^DELETE  remote'; then
     echo "# 원격 후보는 건너뜀 — 삭제하려면 apply --remote"
 fi
