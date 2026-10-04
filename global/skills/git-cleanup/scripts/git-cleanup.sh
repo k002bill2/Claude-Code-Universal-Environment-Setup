@@ -71,9 +71,11 @@ UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null |
 TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
 USE_GH=0
-if [ "${GIT_CLEANUP_NO_GH:-0}" != 1 ] && [ "$HAS_REMOTE" = 1 ] && command -v gh >/dev/null 2>&1 \
-    && git remote get-url "$REMOTE" | grep -q 'github.com'; then
-    USE_GH=1
+GH_REPO=""
+if [ "${GIT_CLEANUP_NO_GH:-0}" != 1 ] && [ "$HAS_REMOTE" = 1 ] && command -v gh >/dev/null 2>&1; then
+    # git@github.com:owner/repo.git · https://github.com/owner/repo(.git) → owner/repo
+    GH_REPO="$(git remote get-url "$REMOTE" | sed -n 's#^.*github\.com[:/]\([^/]*/[^/]*\)$#\1#p' | sed 's#\.git$##')"
+    [ -n "$GH_REPO" ] && USE_GH=1
 fi
 
 is_protected() {
@@ -106,7 +108,8 @@ merged_reason() {
         echo "squash-merged (merging into ${BASE_REF} is a no-op)"; return 0
     fi
     if [ "$USE_GH" = 1 ]; then
-        num="$(gh pr list --state merged --head "$name" --limit 20 \
+        # 선택한 원격 저장소·기준 브랜치로 고정 — fork/다른 default repo 의 PR 은 근거가 아니다
+        num="$(gh pr list --repo "$GH_REPO" --base "$BASE_NAME" --state merged --head "$name" --limit 20 \
             --json number,headRefOid \
             -q ".[] | select(.headRefOid == \"$ref\") | .number" 2>/dev/null | head -1)"
         if [ -n "$num" ]; then
@@ -133,11 +136,12 @@ wt_flush() {
     if [ "$wt_path" = "$TOPLEVEL" ] || [ "$wt_first" = 1 ]; then
         # 메인·현재 워크트리는 건드리지 않고, 그 체크아웃 브랜치도 삭제 금지
         [ -n "$wt_branch" ] && WT_KEEP_BRANCHES="${WT_KEEP_BRANCHES}${wt_branch} "
-    elif [ "$wt_prunable" = 1 ] || [ ! -d "$wt_path" ]; then
-        row PRUNE worktree "$wt_path" "directory missing"
     elif [ "$wt_locked" = 1 ]; then
+        # 잠금이 먼저 — 언마운트된 외장 디스크의 워크트리는 경로가 없어도 살아 있다
         row KEEP worktree "$wt_path" "locked"
         [ -n "$wt_branch" ] && WT_KEEP_BRANCHES="${WT_KEEP_BRANCHES}${wt_branch} "
+    elif [ "$wt_prunable" = 1 ] || [ ! -d "$wt_path" ]; then
+        row PRUNE worktree "$wt_path" "directory missing"
     else
         local dirty reason sha
         dirty="$(git -C "$wt_path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"

@@ -143,6 +143,15 @@ SCAN="$(cd "${SANDBOX_ROOT}/wt-linked" && bash "$SCRIPT" scan 2>&1)"
 reject_line "G32 메인 워크트리 체크아웃 브랜치는 DELETE 아님" '^DELETE +local +feat/in-main '
 g switch feat/current
 
+# ── 잠긴 워크트리는 경로가 없어도(언마운트) 브랜치 보호 ─────────────────
+g branch wt/locked main
+g worktree add "${SANDBOX_ROOT}/wt-locked" wt/locked
+g worktree lock "${SANDBOX_ROOT}/wt-locked"
+mv "${SANDBOX_ROOT}/wt-locked" "${SANDBOX_ROOT}/wt-locked.unmounted"
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+expect_line "G33 잠긴+경로없는 워크트리 KEEP" '^KEEP +worktree +.*wt-locked .*locked'
+reject_line "G34 잠긴 워크트리의 브랜치는 DELETE 아님" '^DELETE +local +wt/locked '
+
 # ── 현재 브랜치의 원격도 보호 ───────────────────────────────────────────
 g push origin feat/current
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
