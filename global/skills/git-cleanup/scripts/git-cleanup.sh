@@ -84,9 +84,10 @@ is_protected() {
     return 1
 }
 
-# merged_reason <ref> <branch-name> → 머지 사유 출력 후 0, 아니면 1
+# merged_reason <sha> <branch-name> → 머지 사유 출력 후 0, 아니면 1
+# ref 가 아니라 고정된 SHA 로 판정한다 — 판정 도중 ref 가 움직여도 삭제 조건과 어긋나지 않게.
 merged_reason() {
-    local ref="$1" name="$2" merged num
+    local ref="$1" name="$2" out merged num
     if git merge-base --is-ancestor "$ref" "$BASE_REF" 2>/dev/null; then
         echo "merged (ancestor of ${BASE_REF})"; return 0
     fi
@@ -95,14 +96,19 @@ merged_reason() {
         echo "tree identical to ${BASE_REF}"; return 0
     fi
     # patch-id 는 공백·행 위치를 무시해 오탐한다. 실제 3-way 머지 결과로 판정한다.
-    merged="$(git merge-tree --write-tree "$BASE_REF" "$ref" 2>/dev/null | head -1)"
+    # 충돌(exit≠0) 시에도 tree OID 를 출력하므로 종료 코드부터 확인한다
+    if out="$(git merge-tree --write-tree "$BASE_REF" "$ref" 2>/dev/null)"; then
+        merged="$(printf '%s\n' "$out" | head -1)"
+    else
+        merged=""
+    fi
     if [ -n "$merged" ] && [ "$merged" = "$BASE_TREE" ]; then
         echo "squash-merged (merging into ${BASE_REF} is a no-op)"; return 0
     fi
     if [ "$USE_GH" = 1 ]; then
         num="$(gh pr list --state merged --head "$name" --limit 20 \
             --json number,headRefOid \
-            -q ".[] | select(.headRefOid == \"$(git rev-parse "$ref")\") | .number" 2>/dev/null | head -1)"
+            -q ".[] | select(.headRefOid == \"$ref\") | .number" 2>/dev/null | head -1)"
         if [ -n "$num" ]; then
             echo "squash-merged (PR #${num} merged)"; return 0
         fi
@@ -125,14 +131,15 @@ WT_PATHS_REMOVE=""
 wt_flush() {
     [ -n "$wt_path" ] || return 0
     if [ "$wt_path" = "$TOPLEVEL" ] || [ "$wt_first" = 1 ]; then
-        :
+        # 메인·현재 워크트리는 건드리지 않고, 그 체크아웃 브랜치도 삭제 금지
+        [ -n "$wt_branch" ] && WT_KEEP_BRANCHES="${WT_KEEP_BRANCHES}${wt_branch} "
     elif [ "$wt_prunable" = 1 ] || [ ! -d "$wt_path" ]; then
         row PRUNE worktree "$wt_path" "directory missing"
     elif [ "$wt_locked" = 1 ]; then
         row KEEP worktree "$wt_path" "locked"
         [ -n "$wt_branch" ] && WT_KEEP_BRANCHES="${WT_KEEP_BRANCHES}${wt_branch} "
     else
-        local dirty reason
+        local dirty reason sha
         dirty="$(git -C "$wt_path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
         if [ "$dirty" != 0 ]; then
             row KEEP worktree "$wt_path" "dirty (${dirty} change(s))"
@@ -142,10 +149,10 @@ wt_flush() {
         elif is_protected "$wt_branch"; then
             row KEEP worktree "$wt_path" "protected branch ${wt_branch}"
             WT_KEEP_BRANCHES="${WT_KEEP_BRANCHES}${wt_branch} "
-        elif reason="$(merged_reason "refs/heads/$wt_branch" "$wt_branch")"; then
+        elif sha="$(git rev-parse "refs/heads/$wt_branch")" && reason="$(merged_reason "$sha" "$wt_branch")"; then
             row REMOVE worktree "$wt_path" "clean, branch ${wt_branch} ${reason}"
             WT_REMOVE_BRANCHES="${WT_REMOVE_BRANCHES}${wt_branch} "
-            WT_PATHS_REMOVE="${WT_PATHS_REMOVE}$(git rev-parse "refs/heads/$wt_branch") ${wt_branch} ${wt_path}
+            WT_PATHS_REMOVE="${WT_PATHS_REMOVE}${sha} ${wt_branch} ${wt_path}
 "
         else
             row KEEP worktree "$wt_path" "branch ${wt_branch} $(unmerged_reason "refs/heads/$wt_branch")"
@@ -175,9 +182,9 @@ for b in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
     case "$WT_REMOVE_BRANCHES" in *" $b "*) row DELETE local "$b" "after worktree removal"; continue ;; esac
     if is_protected "$b"; then
         continue
-    elif reason="$(merged_reason "refs/heads/$b" "$b")"; then
+    elif sha="$(git rev-parse "refs/heads/$b")" && reason="$(merged_reason "$sha" "$b")"; then
         row DELETE local "$b" "$reason"
-        LOCAL_DEL="${LOCAL_DEL}${b} $(git rev-parse "refs/heads/$b")
+        LOCAL_DEL="${LOCAL_DEL}${b} ${sha}
 "
     else
         row KEEP local "$b" "$(unmerged_reason "refs/heads/$b")"
@@ -194,9 +201,9 @@ if [ "$HAS_REMOTE" = 1 ]; then
         # 현재 브랜치(및 그 upstream)의 원격은 작업 중일 수 있다
         { [ -n "$CURRENT" ] && [ "$name" = "$CURRENT" ]; } && continue
         [ "$r" = "$UPSTREAM" ] && continue
-        if reason="$(merged_reason "refs/remotes/$r" "$name")"; then
+        if sha="$(git rev-parse "refs/remotes/$r")" && reason="$(merged_reason "$sha" "$name")"; then
             row DELETE remote "$r" "$reason"
-            REMOTE_DEL="${REMOTE_DEL}${name} $(git rev-parse "refs/remotes/$r")
+            REMOTE_DEL="${REMOTE_DEL}${name} ${sha}
 "
         else
             row KEEP remote "$r" "$(unmerged_reason "refs/remotes/$r")"

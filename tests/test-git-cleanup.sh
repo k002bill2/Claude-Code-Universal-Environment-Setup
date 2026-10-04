@@ -126,6 +126,23 @@ g switch feat/current
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
 expect_line "G30 위치만 다른 동일 변경은 KEEP" '^KEEP +local +feat/rep '
 
+# ── 바이너리 충돌: merge-tree 가 실패하면서 기준 tree 를 내도 머지로 보지 않는다 ──
+g switch main
+printf 'BIN\000base' > "$W/b.bin"; g add b.bin; g commit -m "bin base"; g push origin main
+g switch -c feat/bin; printf 'BIN\000branch' > "$W/b.bin"; g commit -am "bin branch"
+g switch main;        printf 'BIN\000main' > "$W/b.bin"; g commit -am "bin main"; g push origin main
+g switch feat/current
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+expect_line "G31 바이너리 충돌 브랜치는 KEEP" '^KEEP +local +feat/bin '
+
+# ── 링크된 워크트리에서 실행해도 메인 워크트리의 체크아웃 브랜치는 보호 ────
+g branch wt/linked main
+g worktree add "${SANDBOX_ROOT}/wt-linked" wt/linked
+g switch -c feat/in-main main          # 메인 워크트리가 머지된 브랜치를 체크아웃
+SCAN="$(cd "${SANDBOX_ROOT}/wt-linked" && bash "$SCRIPT" scan 2>&1)"
+reject_line "G32 메인 워크트리 체크아웃 브랜치는 DELETE 아님" '^DELETE +local +feat/in-main '
+g switch feat/current
+
 # ── 현재 브랜치의 원격도 보호 ───────────────────────────────────────────
 g push origin feat/current
 SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
