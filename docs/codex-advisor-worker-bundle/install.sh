@@ -410,11 +410,10 @@ process.stdin.on('end', () => {
     if (isCritical) {
       message =
         `CONTEXT BUDGET CRITICAL: 세션 시작 대비 +${fmt(delta)} 토큰 사용 (${winText} — 고갈 아님). ` +
-        '작업을 자연스러운 지점에서 마무리하고 상태를 저장하세요 — `.planning/phases/<phase>/` 에 대응 ' +
-        '`*-SUMMARY.md` 가 없는 `*-PLAN.md`(미완료 plan)가 있으면 `/gsd:pause-work` 를 사용자에게 제안, ' +
-        '아니면(전부 완료 포함) `.planning/STATE.md` 가 있으면 STATE.md 의 Current Position·Session ' +
-        'Continuity 를 갱신, 둘 다 없으면 HANDOFF.md 를 작성하세요(설계 결정·완료 기준·검증 상태·다음 단계). ' +
-        '코드가 더러우면 WIP 커밋으로 보존. 이어서 할 때는 compact 보다 새 세션을 권고하세요. 저장 포맷을 새로 만들지 마세요.';
+        '작업을 자연스러운 지점에서 마무리하고 상태를 저장하세요 — `.planning/STATE.md` 가 있으면 ' +
+        'STATE.md 의 Current Position·Session Continuity 를 갱신, ' +
+        '없으면 HANDOFF.md 를 작성하세요(설계 결정·완료 기준·검증 상태·다음 단계). ' +
+        '코드가 더러우면 커밋하지 않고 변경을 유지한 채 미커밋 상태를 저장 문서(HANDOFF.md/STATE.md)에 기록 — WIP 커밋은 사용자 요청 시에만. 이어서 할 때는 compact 보다 새 세션을 권고하세요. 저장 포맷을 새로 만들지 마세요.';
     } else {
       message =
         `CONTEXT BUDGET WARNING: 세션 시작 대비 +${fmt(delta)} 토큰 사용 (${winText} — 고갈 아님). ` +
@@ -1308,7 +1307,7 @@ diff를 실제로 검토한 뒤, 조언자가 지적사항 반영을 지시하�
 - 장시간 실행이라 메인 루프를 점유하면 곤란할 때
 
 직접 처리하든 위임하든 Codex 검증은 동일하게 적용한다.
-핸드오프 문서(HANDOFF / pause-work)는 저장 대상이 메인 컨텍스트에만 존재하므로 항상 직접 작성한다.
+핸드오프 문서(HANDOFF / STATE.md)는 저장 대상이 메인 컨텍스트에만 존재하므로 항상 직접 작성한다.
 
 ## 작업 순서 기본형 (위임 조건에 해당할 때)
 위임 조건에 해당하지 않으면 1·3·4 만 남는다 — 설계 → 직접 구현 → Codex 검증 → 반영.
@@ -1361,11 +1360,9 @@ Opus 소진 후 경로는 둘: (a) 두 에이전트의 model: 을 sonnet 으로 
 (1M 창 = +550k, 200k 창 = +40k — 아래 티어 참조).
 컨텍스트 경고(CONTEXT BUDGET WARNING / CONTEXT BUDGET CRITICAL)가 주입되면 즉시:
 1. 진행 중 작업을 자연스러운 지점에서 마무리
-2. 상태 저장 — 분기 기준은 STATE.md 가 아니라 **미완료 plan(대응 `*-SUMMARY.md` 없는 `*-PLAN.md`)의 실존**이다
-   (`/gsd:pause-work` 는 PLAN 을 찾아 동작하며 STATE.md 를 읽지 않는다):
-   - `.planning/phases/<phase>/` 에 미완료 plan 있음 → `/gsd:pause-work`
-   - 그 외(전부 완료 포함) `.planning/STATE.md` 있음 → STATE.md 의 `Current Position`·`Session Continuity` 갱신
-   - 둘 다 없음 → HANDOFF.md 작성(설계 결정·완료 기준·검증 상태·다음 단계). 코드가 더러우면 WIP 커밋으로 보존
+2. 상태 저장:
+   - `.planning/STATE.md` 있음 → STATE.md 의 `Current Position`·`Session Continuity` 갱신
+   - 없음 → HANDOFF.md 작성(설계 결정·완료 기준·검증 상태·다음 단계). 코드가 더러우면 커밋하지 않고 변경을 유지한 채 미커밋 상태를 저장 문서(HANDOFF.md/STATE.md)에 기록 — WIP 커밋은 사용자 요청 시에만
 3. 새 세션을 권고한다 (compact 보다 우선). 저장 포맷을 새로 만들지 않는다.
 경고는 예산 소진(세션 시작 대비 델타)과 컨텍스트 창 사용률을 함께 표시한다.
 둘은 다른 지표다 — 창에 여유가 있어도 예산을 넘으면 정지 대상이다.

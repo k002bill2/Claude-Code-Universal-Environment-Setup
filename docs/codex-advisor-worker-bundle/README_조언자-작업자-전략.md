@@ -113,10 +113,9 @@ Claude Code 안에서 Codex로 코드 리뷰·작업 위임을 하는 공식 플
   대형 창(>= 500k)은 WARNING 40% / CRITICAL 55% (1M 창 = +400k / +550k).
   창 크기를 모를 때(브리지 `window` 부재)는 200k 로 폴백해 소형 티어를 적용한다 — 모르면 보수적으로.
   `CONTEXT BUDGET WARNING`/`CONTEXT BUDGET CRITICAL` 이 주입되면 ① 진행 중 작업 마무리 → ② 상태 저장
-  (분기 조건은 STATE.md 가 아니라 **미완료 plan 의 실존**이다 — `.planning/phases/<phase>/` 에 대응
-  `*-SUMMARY.md` 없는 `*-PLAN.md` 가 있으면 `/gsd:pause-work` 제안, 아니면(전부 완료 포함)
-  `.planning/STATE.md` 가 있으면 그 `Current Position`·`Session Continuity` 갱신, 둘 다 없으면
-  HANDOFF.md 작성. 코드가 더러우면 `/wip-save` 병행)
+  (`.planning/STATE.md` 가 있으면 그 `Current Position`·`Session Continuity` 갱신, 없으면
+  HANDOFF.md 작성. 코드가 더러우면 커밋하지 않고 변경을 유지한 채 미커밋 상태를 저장 문서(HANDOFF.md/STATE.md)에 기록
+  — WIP 커밋은 사용자 요청 시에만)
   → ③ **새 세션 권고**(compact 보다 우선 — 무엇을 남길지 조언자가 직접 고를 수 있다).
   저장 포맷을 새로 만들지 않는다. 경고는 예산 소진(세션 시작 대비 델타)과 컨텍스트 창 사용률을
   **함께** 표시한다 — 둘은 다른 지표이고, 창에 여유가 있어도 예산을 넘으면 정지 대상이다.
@@ -124,7 +123,7 @@ Claude Code 안에서 Codex로 코드 리뷰·작업 위임을 하는 공식 플
 - **worker 보고 수신:** 가능하면 동기 실행으로 결과를 직접 받는다. 백그라운드 실행 시 완료 보고
   텍스트가 조언자에게 전달되지 않을 수 있으므로, 보고를 기다리지 말고 산출물(staged diff·테스트 실행)을 직접 검증한다.
 - **조언자 직접 코딩 금지:** 구현은 worker 위임이 기본값. 예외는 ① 단일 파일·30줄 이내 문서/설정 수정,
-  ② **컨텍스트 핸드오프 문서(HANDOFF / pause-work) 작성 — 줄 수 제한 없음**(저장 대상이 메인 세션
+  ② **컨텍스트 핸드오프 문서(HANDOFF / STATE.md) 작성 — 줄 수 제한 없음**(저장 대상이 메인 세션
   컨텍스트에만 존재해 위임이 원리적으로 불가능). 예외여도 Codex 검증은 동일 적용.
 - **승인 후 정리:** 서브에이전트는 과제 완료 후에도 idle로 상주한다. 승인이 끝나면 TaskStop(또는
   `ctrl+x ctrl+k`)으로 종료해 상주 에이전트를 남기지 않는다.

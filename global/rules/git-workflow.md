@@ -18,7 +18,8 @@ co-author 푸터(`Co-Authored-By` + `Claude-Session`)는 **자동 주입을 전�
 
 ## Feature Implementation Workflow
 
-계획 → TDD(SSOT: golden-principles.md) → 리뷰 → 완료 후 Conventional Commits 형식으로 커밋 & 푸시.
+계획 → TDD(SSOT: golden-principles.md) → 리뷰 → 완료 후 변경 유지 + 검증 결과 보고.
+커밋 & 푸시는 사용자가 요청할 때 Conventional Commits 형식으로 (git 대상만).
 
 리뷰 도구는 목적이 다르다:
 - 구현 중 자기 점검: superpowers 스킬(`requesting-code-review` 등), `/code-review`, `/security-review`.
