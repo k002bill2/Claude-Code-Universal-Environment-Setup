@@ -30,7 +30,7 @@ CTX_MARK_START='# <<< codex-advisor-worker-bundle:ctx-budget:start — install.s
 CTX_MARK_END='# <<< codex-advisor-worker-bundle:ctx-budget:end -->>>'
 
 # 번들이 소유하는 컨텍스트 예산 훅. 브리지 파일을 읽고 경고를 주입한다.
-# (구 버전은 GSD 플러그인 소유 gsd-context-monitor.js 에 합성값을 태웠다 — 플러그인
+# (구 버전은 구 플러그인 소유 컨텍스트 모니터 훅에 합성값을 태웠다 — 플러그인
 #  업데이트로 임계치·스키마가 바뀌면 조용히 깨지는 의존이라 자기 훅 소유로 전환했다.)
 CTX_HOOK_PATH="${CLAUDE_DIR}/hooks/advisor-context-budget.js"
 # settings.json 엔트리 '탐색' 키 — 우리가 설치한 **절대경로**다.
@@ -214,7 +214,7 @@ install_file_preserve_mode() {
 }
 
 # 번들 소유 컨텍스트 예산 훅을 설치한다. 브리지 JSON(사실값)을 읽어 델타 임계로 판정하고
-# 경고를 additionalContext 로 주입한다. 남의 플러그인(GSD) 내부 구현에 의존하지 않는다.
+# 경고를 additionalContext 로 주입한다. 남의 플러그인 내부 구현에 의존하지 않는다.
 install_ctx_hook() {
   echo "▶ ~/.claude/hooks/advisor-context-budget.js 작성"
   mkdir -p "${CLAUDE_DIR}/hooks"
@@ -613,7 +613,7 @@ for g in post:
 hooks['PostToolUse'] = new_post
 post = new_post
 if not found and do_add:
-    # matcher 키를 넣지 않는다 — 없으면 전체 매칭 (기존 GSD 엔트리와 동일한 형태)
+    # matcher 키를 넣지 않는다 — 없으면 전체 매칭 (기존 구 플러그인 엔트리와 동일한 형태)
     post.append({'hooks': [{'type': 'command', 'command': cmd}]})
     added = True
 
@@ -1168,9 +1168,9 @@ if [ -n "$__ctx_sid" ]; then
   # ${TMPDIR:-/tmp} 만 보면 TMP·TEMP 만 설정된 환경에서 브리지는 /tmp 에 쓰고 훅은 $TMP 를 읽어
   # 메트릭이 영영 만나지 않는다 → 모든 컨텍스트 예산 경고가 조용히 억제된다.
   __ctx_dir="${TMPDIR:-${TMP:-${TEMP:-/tmp}}}"; __ctx_dir="${__ctx_dir%/}"
-  # 구 배선(GSD) 잔여 파일 정리 — '사용량 가드보다 앞'이어야 한다.
+  # 구 배선(외부 플러그인 훅) 잔여 파일 정리 — '사용량 가드보다 앞'이어야 한다.
   # 업그레이드 직후 첫 렌더가 CURRENT_USAGE=null 이거나 토큰 합이 0 이면 아래 가드 안쪽에
-  # 도달하지 못하는데, 그 사이 GSD 훅이 남은 claude-ctx-{sid}.json 을 TTL(60초) 동안 읽어
+  # 도달하지 못하는데, 그 사이 구 플러그인 훅이 남은 claude-ctx-{sid}.json 을 TTL(60초) 동안 읽어
   # 이번 마이그레이션이 없애려던 '낡은 경고'를 주입한다.
   # 글롭이 아니라 정확한 이름만 지운다 — 다른 세션이나 advisor 파일을 휩쓸지 않는다.
   rm -f "${__ctx_dir}/claude-ctx-${__ctx_sid}.json" \
@@ -1542,7 +1542,7 @@ fi
 #
 # 브리지를 먼저 바꾸면, 등록이 실패했을 때 '컨텍스트 경고가 전부 꺼진 상태'가 만들어진다:
 #   새 브리지는 claude-ctx-advisor-*.json 만 쓰고 구 메트릭까지 지우는데,
-#   그 값을 읽을 advisor 훅은 미등록이고, 남아있는 GSD 훅이 찾는 파일은 아무도 안 쓴다.
+#   그 값을 읽을 advisor 훅은 미등록이고, 남아있는 구 플러그인 훅이 찾는 파일은 아무도 안 쓴다.
 #   → 설치는 "성공"으로 끝나고 감지 수단만 사라진다. 이 작업이 고치려던 실패 양식 그 자체다.
 # 등록에 실패하면 statusline 을 건드리지 않는다 — 업그레이드면 구 브리지가 계속 동작하고,
 # 신규 설치면 애초에 아무것도 없었으므로 회귀가 없다.

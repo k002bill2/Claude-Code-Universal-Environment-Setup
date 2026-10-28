@@ -2,8 +2,8 @@
 
 작성: 2026-07-27 · 작성 사유: 컨텍스트 예산 경고(WARNING) 발동 — 본 기능이 실전에서 스스로 트리거
 
-> `.planning/STATE.md` 가 존재하나 그것은 GSD 워크플로우 상태이고 **이 작업을 추적하지 않는다.**
-> 따라서 `/gsd:pause-work` 대신 이 문서를 쓴다 (규칙의 의도 = 이미 추적되는 것을 중복 저장하지 않기).
+> `.planning/STATE.md` 가 존재하나 그것은 구 플러그인 워크플로우 상태이고 **이 작업을 추적하지 않는다.**
+> 따라서 구 플러그인의 pause-work 커맨드 대신 이 문서를 쓴다 (규칙의 의도 = 이미 추적되는 것을 중복 저장하지 않기).
 
 ## 상태: 번들 전용 훅 전환 · **Q·R·S·T·U·V·W·X 전부 반영 · Codex 17라운드 대기**
 > Q·S 조언자 재현 통과 → R 의 좁힘이 U 를 열어 **U·T 수정** → 파생 잔여 2건(토큰 추출·dedupe) 닫음
@@ -71,13 +71,13 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
   `baseline/current/delta/window/window_pct`) → **번들 소유 훅** `~/.claude/hooks/advisor-context-budget.js`
   (settings.json `hooks.PostToolUse` 에 등록). 임계는 훅이 `delta` 와 `window` 로 직접 판정한다
   (창 티어별 비율 — 위 "임계치" 항목 참조. `window` 부재/이상 시 200k 폴백 → 소형 티어).
-  디바운스 5회 + 승격 시 즉시 발화는 훅이 자체 구현(구 GSD 훅에서 공짜로 받던 것)
+  디바운스 5회 + 승격 시 즉시 발화는 훅이 자체 구현(구 플러그인 훅에서 공짜로 받던 것)
 - **[폐기됨 — 이력]** 구 배선은 `claude-ctx-{sid}.json` 에 `remaining_percentage = 100 - delta*100/78666` 를
-  **합성**해 GSD 플러그인 훅에 태웠다. 그 기교(`78666 = floor(59000/0.75)`, 정수 나눗셈 경계 보정)는
+  **합성**해 구 플러그인 훅에 태웠다. 그 기교(`78666 = floor(59000/0.75)`, 정수 나눗셈 경계 보정)는
   **전량 제거됐다.** 지금 코드에서 `remaining_percentage`·`78666` 을 찾으면 안 된다.
-  폐기 이유: ① GSD 플러그인 버전 의존(R1, High) ② 주입 문구의 `Usage at X%` 가 창 사용률이 아니라
+  폐기 이유: ① 구 플러그인 버전 의존(R1, High) ② 주입 문구의 `Usage at X%` 가 창 사용률이 아니라
   예산 소진율이라 상태줄과 모순돼 보임(R3). 둘 다 **해소됨**
-- 저장 포맷 **신설 안 함** — GSD/HANDOFF/`wip-save` 중 상황에 맞는 것에 위임
+- 저장 포맷 **신설 안 함** — 구 플러그인/HANDOFF/`wip-save` 중 상황에 맞는 것에 위임
 - 역할: `researcher`(sonnet, 외부 조사) 신설 / `analyzer`(haiku) 로컬 전담 / `architect` 웹도구 제거
 
 ## 검증 완료
@@ -99,7 +99,7 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 | ↳ 판정 범위·표기 | 마커 **밖**에만 `$input` 이 있는 수리본 → **보존**(범위 한정 확인) / 블록 안 `${input}` 중괄호 표기 → **제거**(두 표기 모두 인식) |
 | **선언 형태 매트릭스** | 구 블록 심은 상태로 설치 → `input=$(cat)` **마커 1** / `export input=$(cat)` **마커 1**(삭제 안 됨) / `  input=$(cat)`(선행 공백) **마커 1** / `payload=$(cat)` **마커 0·백업 1**(제거). **RED**(좁은 `^input=`): `export`·선행공백 케이스가 **마커 0** — 동작하던 브리지가 삭제됨 |
 | ↳ 앵커 정규식 단위 | MATCH: `input=` `export input=` `  input=` `declare -x input=` `local input=` `typeset input=` / no: `payload=` `# input=주석` `sinput=` `myinput=` |
-| **Red-Green 종단 주입** | GREEN: `CONTEXT CRITICAL` 실제 주입 / RED: 삭제 시 소멸. ※ **구 GSD 훅 메시지**(당시 배선). 현행 문자열은 `CONTEXT BUDGET WARNING`/`CONTEXT BUDGET CRITICAL` |
+| **Red-Green 종단 주입** | GREEN: `CONTEXT CRITICAL` 실제 주입 / RED: 삭제 시 소멸. ※ **구 플러그인 훅 메시지**(당시 배선). 현행 문자열은 `CONTEXT BUDGET WARNING`/`CONTEXT BUDGET CRITICAL` |
 | `set -e` 회귀 | GREEN `OK` 생존 / RED(`\|\| true` 제거) 출력 `[]` 사망 — **픽스처 기준.** 실환경 `awesome-statusline.sh` 자체에는 `set -` 선언이 없어(확인함) 이 방어는 다른 사용자의 `set -e` statusline 대비용이다 |
 | statusLine 5형태 | `~/…`, `bash ~/…`, `env FOO=1 ~/…`, `bash $HOME/…`, `${HOME}/…` 전부 마커 1개 |
 | 원자성 | 퍼미션 755 보존, tmp 잔여 0, **rename 실패 시 원본 md5 동일 + exit 1** |
@@ -217,7 +217,7 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 5~8라운드는 모두 **앵커/판정 정밀도**라는 한 계열이었다: 앵커를 좁히면 정상 파일이 정리 경로로
 새고(F), 정리를 넓히면 수리본을 파괴한다(E). 판정을 단일 정의로 모은 것이 계열 전체의 봉합이다.
 
-## 2026-07-29 전환 — 번들 전용 컨텍스트 훅 (GSD 의존 제거)
+## 2026-07-29 전환 — 번들 전용 컨텍스트 훅 (구 플러그인 의존 제거)
 
 브랜치 `feat/ctx-own-hook` · **미커밋**(Codex 검증 대기).
 착수 확인용: `grep -c 'advisor-context-budget' install.sh` 가 0 이면 미착수.
@@ -229,15 +229,15 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 |---|---|---|
 | 브리지 파일 | `claude-ctx-{sid}.json` | `claude-ctx-advisor-{sid}.json` (상태·디바운스 파일도 동일 접두사) |
 | 기록 내용 | 합성 `remaining_percentage`/`used_pct` (`BUDGET_RAW=78666` 역산) | 사실값 `baseline/current/delta/window/window_pct` |
-| 판정 주체 | `gsd-context-monitor.js` (GSD 플러그인 소유) | `advisor-context-budget.js` (**번들 소유**) |
+| 판정 주체 | 구 플러그인 컨텍스트 모니터 훅 (구 플러그인 소유) | `advisor-context-budget.js` (**번들 소유**) |
 | `settings.json` | 무수정 | `hooks.PostToolUse` 에 멱등 병합 (백업 + 유효성 게이트) |
 | 경고 문구 | `Usage at X%. Remaining: Y%.` (숫자가 예산 소진율) | 예산 델타와 창 사용률을 **분리 표기** + "고갈 아님" 명시 |
 
-해소: **R1**(플러그인 내부 의존) · **R2**(GSD config 로 무력화 가능) · **R3**(숫자 의미 왜곡).
+해소: **R1**(플러그인 내부 의존) · **R2**(구 플러그인 config 로 무력화 가능) · **R3**(숫자 의미 왜곡).
 새로 진 위험: **R3b** — 설치기가 살아있는 `settings.json` 에 쓴다(§7 규율표로 방어).
 
-**GSD 훅은 건드리지 않았다.** 브리지 파일명이 달라져 `existsSync` 가드에서 종료 = 이 기능
-도입 **이전의 원래 휴면 상태**로 자연히 복귀. `settings.json` 의 GSD 엔트리는 그대로 둔다.
+**구 플러그인 훅은 건드리지 않았다.** 브리지 파일명이 달라져 `existsSync` 가드에서 종료 = 이 기능
+도입 **이전의 원래 휴면 상태**로 자연히 복귀. `settings.json` 의 구 플러그인 엔트리는 그대로 둔다.
 
 **동반 처리 2건**
 - `hooks/universal/contextMonitor.js`(Stop) **조건부 제거** — `commands/save-and-compact.md` 가
@@ -246,7 +246,7 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 - `~/.claude/skills/external-memory/SKILL.md` 의 죽은 트리거 "Token Threshold (150K)" →
   Context Budget Trigger 로 교체 (1회성 직접 수정 — 번들 소유 파일이 아니라 설치기에 넣지 않았다).
 
-**제거한 것:** `GSD_HOOK_PIN` / `check_gsd_hook_version()`. GSD 내부 구현에 의존하지 않게 되어
+**제거한 것:** 구 훅 버전 핀 상수 / 구 훅 버전 대조 함수. 구 플러그인 내부 구현에 의존하지 않게 되어
 버전 대조가 무의미해졌고, 남겨두면 "브리지를 써도 경고가 주입되지 않습니다" 같은 **거짓 경고**를
 낸다. 이번 변경이 만든 사문화이므로 surgical-changes 원칙의 "자기 변경이 만든 것만 정리"에 해당한다.
 
@@ -259,14 +259,14 @@ docs/codex-advisor-worker-bundle/HANDOFF.md                       ← 이 문서
 | ↳ 내부 훅 단위 제거 | contextMonitor 제거 후 **`stopEvent.js`·`cleanup-bg-shells.sh` 생존** 단언 통과 |
 | 멱등 | 2회 실행 시 `변경 없음 → 건너뜀`, 결과 `diff` 0, 우리 엔트리 **1개**, 백업 1개(== 원본) |
 | **유효성 게이트 (RED-GREEN)** | GREEN(픽스처로 mv 직후 파일 파손): 백업 복원 + `exit 1` + 배너 미출력, 복원본 훅 12종. RED(게이트 무력화): **깨진 채 잔존 · exit 0 · 배너 출력**. ※ 정상 경로(파싱→덤프)는 항상 유효한 JSON 을 내므로 이 분기는 **실사용에서 도달하지 않는다** — 잘린/중단된 쓰기 대비 안전망이며 발동은 픽스처로만 확인했다 |
-| **구 파일 정리 (RED-GREEN)** | advisor 파일이 **먼저** 생긴 뒤 구 파일이 나타나는(재래치 없는) 순서로 검증. GREEN(무조건 정리): 구 브리지 제거·advisor 파일 무사·GSD 무출력. RED(재래치 경로에만 정리 = 수정 전): 구 브리지 **잔존**, GSD 훅이 `CONTEXT CRITICAL: Usage at 80%. Remaining: 20%.` **실제 주입** |
+| **구 파일 정리 (RED-GREEN)** | advisor 파일이 **먼저** 생긴 뒤 구 파일이 나타나는(재래치 없는) 순서로 검증. GREEN(무조건 정리): 구 브리지 제거·advisor 파일 무사·구 플러그인 무출력. RED(재래치 경로에만 정리 = 수정 전): 구 브리지 **잔존**, 구 플러그인 훅이 `CONTEXT CRITICAL: Usage at 80%. Remaining: 20%.` **실제 주입** |
 | 훅 임계·디바운스 | 51,132→무출력 / 51,133→WARNING / 직후 2회 억제 / 59,000→**승격 즉시 CRITICAL** / 직후 4회 억제 / 6회째 재발화 |
 | ↳ 카운터 비소모 | 임계 미만에서는 `-warned.json` 생성 안 됨(경고 이력 없는 세션의 디바운스 소진 방지) |
 | 방어 경로 | 브리지 없음 / 파싱 실패 / stale / stdin 비JSON / session_id 없음 / delta 비수치 → **전부 무출력 + exit 0** |
 | 메시지 | CRITICAL·WARNING 둘 다 delta 실수치 + 창 사용률 + "고갈 아님" 포함. `window_pct` 결측 시 "창 사용률은 미상" 폴백 |
 | statusline 사실 기록 | 50905→delta 0 / 102038→**delta 51133** / 109905→**delta 59000** / 62000→재래치 후 delta 0. `remaining_percentage`·`used_pct` **필드 없음**. 전 렌더 stderr 0바이트 |
 | ↳ 창 무관 | 같은 delta 59,000 이 200k 창에서 `window_pct 54`, 1M 창에서 `10` — 판정은 동일 |
-| **GSD 휴면** | 미리 깔아둔 구 파일 4종이 첫 렌더에서 정리됨, `claude-ctx-{sid}.json` 미생성, 실제 `gsd-context-monitor.js` 에 먹여도 **무출력** |
+| **구 플러그인 휴면** | 미리 깔아둔 구 파일 4종이 첫 렌더에서 정리됨, `claude-ctx-{sid}.json` 미생성, 실제 구 플러그인 컨텍스트 모니터 훅에 먹여도 **무출력** |
 | contextMonitor 조건부 | (a) `save-and-compact.md` 없음 → 제거 + 안내 / (b) 픽스처로 생성 → **제거 안 함**. 둘 다 확인 |
 | 기존 회귀 | 마커 1개 · 2회 실행 `diff` 0 · 마커 밖 보존 · 퍼미션 755 · tmp 잔여 0 · 선언 형태 4종(`input=`/`export input=`/선행공백/`payload=`) · 3-way 정리(구 블록 제거·수리본 보존·블록 없음 무동작) · 심링크 유지 + 실제 파일에 마커 · 마커 구조 비정상 시 md5 무변경 |
 | 설치 블록 == heredoc | `diff` 0 |
@@ -330,8 +330,8 @@ node 가 있으면 매 도구 호출 **exit 127**, 있으면 **다른 바이너�
 
 ```
 statusline → claude-ctx-advisor-*.json 만 쓰고 구 메트릭까지 삭제
-settings   → advisor 훅 미등록, GSD 훅만 잔존
-GSD 훅     → claude-ctx-*.json 을 찾는데 아무도 안 쓴다 → 조용히 종료
+settings   → advisor 훅 미등록, 구 플러그인 훅만 잔존
+구 플러그인 훅     → claude-ctx-*.json 을 찾는데 아무도 안 쓴다 → 조용히 종료
 결과       → 설치는 "성공"으로 끝나고 감지 수단만 사라진다
 ```
 
@@ -349,7 +349,7 @@ GSD 훅     → claude-ctx-*.json 을 찾는데 아무도 안 쓴다 → 조용�
 | 항목 | 결과 |
 |---|---|
 | 문법 | `bash -n install.sh` PASS · 모든 `return 1` 경로에 `MS_REASON` 세팅 확인(감사 출력) |
-| **(a) 6홉 심링크 (RED-GREEN)** | GREEN: statusline `claude-ctx-advisor` 참조 **0건**(구 형식 유지) · 훅 미등록 · exit 0 · 경고 출력 · **구 브리지 렌더 시 `claude-ctx-RT.json` 생성**(GSD 훅 계속 동작) / RED(수정 전 순서): 참조 **4건**(전환됨) · 훅 미등록 · 경고 **0** · **`claude-ctx-RT.json` 미생성, advisor 파일만 생성 = 경고 전면 소실** |
+| **(a) 6홉 심링크 (RED-GREEN)** | GREEN: statusline `claude-ctx-advisor` 참조 **0건**(구 형식 유지) · 훅 미등록 · exit 0 · 경고 출력 · **구 브리지 렌더 시 `claude-ctx-RT.json` 생성**(구 플러그인 훅 계속 동작) / RED(수정 전 순서): 참조 **4건**(전환됨) · 훅 미등록 · 경고 **0** · **`claude-ctx-RT.json` 미생성, advisor 파일만 생성 = 경고 전면 소실** |
 | (b) `python3`/`jq` 부재 | GREEN: 전환 안 함 + 사유 출력 + 구 브리지 동작. RED 도 전환되지 않음 — 그 환경에선 `install_ctx_bridge` 자체가 `jq` 부재로 조기 종료하기 때문이다. **결함을 가르는 것은 (a)** 이며 (b)는 무해함 확인용이다 |
 | (c) 정상 경로 무회귀 | 훅 등록 YES · 브리지 전환(참조 4건·마커 1) · contextMonitor 제거 · 구 메트릭 정리 배선 1건 |
 | 회귀 | 디바운스 5회 간격 · 임계 51,133/59,000 · 퍼미션 `600→600` · 심링크 유지 · 멱등 엔트리 1개 · 정규화 유실 0 |
@@ -434,7 +434,7 @@ else …
 ```
 
 **지적 P [P2] — 구 메트릭 정리가 사용량 가드 안쪽.** 업그레이드 직후 첫 렌더가
-`CURRENT_USAGE:null` 또는 토큰 합 0 이면 정리에 도달하지 못하고, GSD 훅이 남은
+`CURRENT_USAGE:null` 또는 토큰 합 0 이면 정리에 도달하지 못하고, 구 플러그인 훅이 남은
 `claude-ctx-{sid}.json` 을 TTL(60초) 동안 읽어 **이번 마이그레이션이 없애려던 낡은 경고를 주입**한다.
 → `session_id` 획득 직후, 사용량 가드보다 **앞**으로 옮겼다(정확한 이름 4종만 `rm -f`, 글롭 금지).
 실측: 설치된 블록에서 정리 16행 / 가드 21행 — 앞선다.
@@ -568,14 +568,14 @@ R 은 엔트리 **탐색**을 basename → 절대경로(`CTX_HOOK_PATH`)로 좁�
 셸 경유로 실행하는지에 달렸고 이 리포에서 판정 불가. 설치기 측 사실(탐색 miss → 중복 생성 → `exact:1` 통과)만 주장한다.
 심링크 변형은 절대경로라 그 가정이 필요 없다(inode 동일 실측).
 
-### 미결 결정 해소 — `GSD_HOOK_PIN` 제거 **승인** (2026-07-29)
+### 미결 결정 해소 — 구 훅 버전 핀 상수 제거 **승인** (2026-07-29)
 
 9라운드부터 4회 이월된 건. **승인한다.**
-- 그 함수는 GSD 플러그인 소유 `gsd-context-monitor.js` 의 버전을 핀(`1.26.0`)과 대조했다. 번들이
+- 그 함수는 구 플러그인 소유 컨텍스트 모니터 훅의 버전을 핀(`1.26.0`)과 대조했다. 번들이
   자기 훅을 소유하게 되어 **판정 대상이 배선에서 빠졌다**
-- 남기면 GSD 버전업 시 "브리지를 써도 컨텍스트 경고가 주입되지 않습니다"라는 **거짓 경고**를 낸다 —
+- 남기면 구 플러그인 버전업 시 "브리지를 써도 컨텍스트 경고가 주입되지 않습니다"라는 **거짓 경고**를 낸다 —
   이 작업이 없애려던 R1(플러그인 내부 의존)을 경고 문구로 되살리는 셈
-- 기계적 확인: 워킹트리 `GSD_HOOK_PIN`·`check_gsd_hook_version` **0건**, HEAD 에는 정의(32·115행)+호출(620행)
+- 기계적 확인: 워킹트리 구 훅 버전 핀 상수·대조 함수 **0건**, HEAD 에는 정의(32·115행)+호출(620행)
   → **정의와 호출이 함께** 제거되어 dead reference 없음
 - Codex 14라운드는 이 제거에 **아무 말도 하지 않았다.** 그것은 승인이 아니라 무언급이다 —
   **조언자 자체 분석으로 승인한 것**이며, 근거는 위 3항(특히 dead reference 기계 확인)이다
@@ -589,11 +589,11 @@ R 은 엔트리 **탐색**을 basename → 절대경로(`CTX_HOOK_PATH`)로 좁�
 **바로 할 일**
 1. `node ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs review --scope working-tree`
    — **13라운드(Q/R/S) 분이 미검증**이다(12라운드 O/P 는 조언자 재현 통과). 장시간이면 `nohup … & disown` 후 `status`/`result` 폴링.
-2. 통과 시 커밋. 제안: `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (GSD 의존 제거)`
+2. 통과 시 커밋. 제안: `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (구 플러그인 의존 제거)`
 
 **미결 결정 1건 (조언자 판단 필요)**
-- `install.sh` 에서 `GSD_HOOK_PIN` + `check_gsd_hook_version()` 을 **제거했다**. 9라운드부터 승인 대기 중.
-  근거: GSD 내부 의존이 사라져 버전 대조가 무의미해졌고, 남기면 "브리지를 써도 컨텍스트 경고가
+- `install.sh` 에서 구 훅 버전 핀 상수 + 구 훅 버전 대조 함수를 **제거했다**. 9라운드부터 승인 대기 중.
+  근거: 구 플러그인 내부 의존이 사라져 버전 대조가 무의미해졌고, 남기면 "브리지를 써도 컨텍스트 경고가
   주입되지 않습니다"라는 **거짓 경고**를 낸다. 되돌리려면 그 함수와 호출 1줄을 복원하면 된다.
 
 **검증 하네스 위치:** `/tmp/awb-test/` (t2·t2b·t3·t5·t8·t11·t12·t13·t14·t15 + `normcmp.py`).
@@ -615,16 +615,16 @@ R 은 엔트리 **탐색**을 basename → 절대경로(`CTX_HOOK_PATH`)로 좁�
 ### 다음 단계
 
 1. **Codex 검증** — `node ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs review --scope working-tree`
-2. 통과 시 커밋 (사용자 지시 대기). 제안: `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (GSD 의존 제거)`
+2. 통과 시 커밋 (사용자 지시 대기). 제안: `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (구 플러그인 의존 제거)`
 
 ## 알려진 잔여 사항
 
-- ~~**R1(High)**: `gsd-context-monitor.js` 는 GSD 플러그인 소유~~ → **2026-07-29 해소.** 번들이 훅을 직접 소유한다(위 전환 절)
+- ~~**R1(High)**: 구 플러그인 컨텍스트 모니터 훅은 구 플러그인 소유~~ → **2026-07-29 해소.** 번들이 훅을 직접 소유한다(위 전환 절)
 - **신규**: `settings.json` 병합은 파싱→덤프 왕복이라 **원본 바이트 보존이 원리적으로 불가능**하다(들여쓰기·키 순서는 유지되나 파일이 재직렬화된다). 보존 검증은 정규화 JSON 깊은 비교로 한다
 - **신규**: 유효성 게이트②는 정상 경로에서 도달하지 않는다(파싱→덤프는 항상 유효한 JSON). 잘린 쓰기·중단된 쓰기 대비 안전망이며 픽스처로만 발동을 확인했다
 - **신규**: `external-memory/SKILL.md` 는 34행 트리거 항목만 고쳤다. **86·110·132행에 "150K" 표현이 남아 있다**(브리프 범위 밖) — 후속 정리 필요
-- **신규**: **죽은 세션**의 구 배선 파일(`claude-ctx-{sid}*`)은 그 세션의 statusline 이 다시 렌더되지 않으므로 남는다. GSD 훅의 60초 staleness 가드가 걸러 무해하며, 정리하려면 수동 삭제가 필요하다
-- **신규**: `install.sh` 에서 `GSD_HOOK_PIN` / `check_gsd_hook_version()` 을 **제거했다**(판단 필요 — 조언자·Codex 승인 대상). 근거: GSD 내부 구현 의존이 사라져 버전 대조가 무의미해졌고, 남겨두면 "브리지를 써도 컨텍스트 경고가 주입되지 않습니다" 라는 **거짓 경고**를 낸다. 되살리기를 원하면 되돌릴 수 있다
+- **신규**: **죽은 세션**의 구 배선 파일(`claude-ctx-{sid}*`)은 그 세션의 statusline 이 다시 렌더되지 않으므로 남는다. 구 플러그인 훅의 60초 staleness 가드가 걸러 무해하며, 정리하려면 수동 삭제가 필요하다
+- **신규**: `install.sh` 에서 구 훅 버전 핀 상수 / 구 훅 버전 대조 함수를 **제거했다**(판단 필요 — 조언자·Codex 승인 대상). 근거: 구 플러그인 내부 구현 의존이 사라져 버전 대조가 무의미해졌고, 남겨두면 "브리지를 써도 컨텍스트 경고가 주입되지 않습니다" 라는 **거짓 경고**를 낸다. 되살리기를 원하면 되돌릴 수 있다
 - **갱신(해소)**: 결함 U 잔여였던 `nested`(`sh -c "node …"`) · `badq`(따옴표 불균형) 2형태는 **토큰 '추출'만 넓혀** 닫았다 — 각 토큰을 whitespace 로 재분해하고, 확장 전에 앞뒤 `"`·`'` 를 strip 한다. **'판정'(realpath 완전일치)은 그대로**라 R 보호는 손대지 않았다(실측: `node /other/project/advisor-context-budget.js --flag` 원문 보존). 두 형태 모두 엔트리 1개 수렴·2회차 `변경 없음`. `jq` 경로는 판정이 `contains`(부분일치)라 애초에 토큰화하지 않으므로 **이 2형태를 이미 덮고 있었다**(수정 불필요 — 실측 확인)
 - **신규(잔여)**: **토큰 추출은 1단계 재분해까지만 덮는다.** 더 깊은 셸 중첩·`eval` 체인처럼 경로가 whitespace 로 분리된 낱말로 드러나지 않는 표기는 여전히 python3 경로에서 놓친다(의도적 — 임의의 셸 문법을 쫓지 않는다). **`jq` 경로는 심링크 별칭을 원리적으로 놓친다** — jq 에 `realpath` 가 없어 표기 4형태(절대경로·`~/…`·`$HOME/…`·`${HOME}/…`) 문자열 동치만 덮는다(실측: jq 심링크 변형 엔트리 2개). 놓치면 탐색·계수가 함께 놓쳐 **이중 등록이 `exact:1` 로 조용히 통과한다.** 출처는 U 와 같다 — 설치기 자신은 이런 표기를 쓰지 않으므로 수동 편집·dotfiles 동기화 경유에서만 발생한다
 - **신규(해소)**: **'별칭 + 절대경로 공존' → `dup:2` 설치 중단**은 dedupe 로 닫았다. **판정을 통과한 엔트리들 사이에서만** 첫 번째를 제자리에 남기고 커맨드를 정규값으로 갱신, 나머지는 제거한다(python·jq 양쪽). 판정에 실패한 엔트리는 세지도 지우지도 않는다. 자리를 옮기지 않는 이유는 jq 경로가 `cmp -s` 로 멱등을 판정하기 때문. `deduped` 를 '변경 없음(exit 10)' 조건에 **반드시** 포함해야 한다 — 빠뜨리면 `[정규, 정규]`(중간 빌드를 이미 돌린 실제 모집단)에서 `added`·`updated` 가 모두 거짓이라 파일이 그대로 남아 `dup:2` 가 유지된다
@@ -633,7 +633,7 @@ R 은 엔트리 **탐색**을 basename → 절대경로(`CTX_HOOK_PATH`)로 좁�
 - **신규(함정 · jq 블록 편집자용)**: 병합 jq 프로그램은 **bash 홑따옴표 문자열**이다. 주석에라도 홑따옴표를 쓰면(`'첫 번째만'` 등) 문자열이 닫혔다 열려 **인자가 조용히 쪼개진다**. `bash -n` 은 따옴표 짝이 맞아 **통과하고**, 설치기는 `jq` 실패를 `2>/dev/null` 로 삼켜 `settings.json 을 파싱할 수 없습니다`(rc=3)로만 보인다 — 원인과 증상이 완전히 어긋난다. jq 쪽 새 코드의 홑따옴표는 전부 `'` 로 쓴다(`ctx_toks` 의 `gsub` 참조). 실제로 이번에 한 번 밟았고 **하네스 양성 대조가 잡아냈다**
 - **신규(측정 함정)**: **브리지 전환 여부를 statusline 마커 유무로 판정하면 안 된다.** 테스트 픽스처가 실환경 `awesome-statusline.sh` 를 복사해 오면 **이미 마커가 들어 있어 항상 참**이 된다(거짓 양성 — RED 가 침묵한다). 로그의 `브리지를 전환하지 않았습니다` 유무로 판정하라. `t18_u.sh` 의 `bridged()` 가 이 방식이다
 - **신규**: `jq` 폴백 병합 경로는 `python3` 부재 환경 전용이다. `python3` 만 제거한 PATH 로 검증했고 python3 경로와 **동일한 결과**(엔트리 1개·내부 훅 단위 제거·멱등 `diff` 0)를 냈다. 다만 실사용 경로는 아니므로 회귀 위험은 python3 경로보다 크다
-- `isGsdActive` 판정은 신뢰 불가 — `.planning/STATE.md` 가 실재해도 비-GSD 분기가 떴다(`data.cwd` 가 프로젝트 루트가 아님). REVIEW §1.3 정정 블록 참조
+- 구 훅의 활성 판정 함수 판정은 신뢰 불가 — `.planning/STATE.md` 가 실재해도 비-플러그인 분기가 떴다(`data.cwd` 가 프로젝트 루트가 아님). REVIEW §1.3 정정 블록 참조
 - 서브에이전트 `tools:` 필드의 MCP 와일드카드 지원 여부 **미검증** — `researcher` 는 `WebSearch, WebFetch, Read, Grep, Glob` 만 부여
 - `~/.claude/hooks/universal/contextMonitor.js` 폐기 검토 = 별도 후속 과제(범위 밖)
 - **업그레이드 시 진행 중 세션은 예산이 1회 리셋된다** — 기존 세션에는 `-base` 만 있고 `-prev` 가
@@ -681,7 +681,7 @@ Codex 14라운드의 Q/R/S 무지적은 통과 증명이 아니다("못 찾음")
 2. **지적 T 수정** (jq 폴백 null/false 강제 변환). jq 실행 **전** 타입 검사 → python 과 같은
    `schema:` 신호 → 같은 `-eq 4` 분기 합류. 문자열 케이스의 우연한 방어도 명시 가드로 대체.
 3. Codex 재검증 → 통과 시 커밋. 제안:
-   `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (GSD 의존 제거)`
+   `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (구 플러그인 의존 제거)`
 
 **왜 U 가 먼저인가 (하나만 고칠 수 있다면 U):**
 
@@ -803,7 +803,7 @@ jq 안에서 `error()` 를 던지지 **않고** `ms_err="  schema: …"` + `ms_r
 1. **Codex 15라운드 결과 확인** — `/tmp/awb-test/codex15.log` (2026-07-30 발사, `--scope working-tree`).
    프로세스가 죽었으면 재실행: `nohup node ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs review --scope working-tree > /tmp/awb-test/codex15.log 2>&1 & disown`
 2. 지적이 나오면 반영 → 재검증. 없으면 **커밋(사용자 지시 대기)**. 제안:
-   `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (GSD 의존 제거)`
+   `feat(bundle): 컨텍스트 예산 훅을 번들 소유로 전환 (구 플러그인 의존 제거)`
 
 **검증 하네스:** `~/.claude/awb-test-harness/` (보존본) — `t18_u.sh`(U·dedupe) · `t19_t.sh`(T) ·
 `t16_qrs.sh`(Q/R/S) · 프로브 4종(`pymatch_probe`·`predprobe`·`jqprobe`·`bprobe`) · 기존 회귀 t8/t9/t11/t13.
@@ -834,7 +834,7 @@ jq 안에서 `error()` 를 던지지 **않고** `ms_err="  schema: …"` + `ms_r
 → **cleanup 전용 '단계 직전 스냅샷'** 으로 복원(`install.sh:761-782`). 되돌릴 올바른 상태는
 cleanup 자신의 직전(등록됨 + 전환됨 + 구 모니터 잔존)이다. "복원하지 않기"는 배제 — 쓰기가 파일을
 잘라먹으면 깨진 `settings.json` 이 남고, 그것이 stale 모니터 잔존보다 나쁘다(잔존은 무해: 브리지가
-전환돼 GSD 훅은 `claude-ctx-{sid}.json` 을 못 찾고 종료).
+전환돼 구 플러그인 훅은 `claude-ctx-{sid}.json` 을 못 찾고 종료).
 
 **함정:** 스냅샷을 `.bak.<ts>` 로 만들면 **Q 하네스의 "`.bak` 정확히 1개 + 내용 = 설치 전 원본"이
 깨져 X 를 닫으며 Q 가 다시 열린다.** → 같은 디렉토리 내부 `mktemp` 점파일(`.settings.presnap.*`),
