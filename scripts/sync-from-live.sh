@@ -22,7 +22,7 @@ set -euo pipefail
 #      (기본은 드리프트 "보고"만. --write-hook-blocks 명시 시에만 갱신)
 #
 # 왜 5 가 필요한가: 4 까지만 있던 시절 이 둘이 역동기화 대상이 아니어서
-# 라이브 훅이 두 세대 앞선 채(창 비례 임계 + GSD 분기 갱신) 설치기 heredoc 은
+# 라이브 훅이 두 세대 앞선 채(창 비례 임계 + 상태 저장 분기 갱신) 설치기 heredoc 은
 # 고정 임계(51133/59000)에 머물렀다. 그 상태로 install.sh 를 재실행하면
 # 라이브가 조용히 롤백된다 — 이 스크립트가 없애려던 바로 그 회귀다 (2026-08-21).
 #
@@ -95,7 +95,7 @@ done
 
 # ── 2. agents (repo 가 이미 소유한 에이전트만) ───────────────────────────
 # rules 루프처럼 라이브를 순회하면 안 된다 — 라이브에는 조언자 번들이 만든
-# architect/worker 와 gsd-* 수십 개가 있어 전부 페이로드로 딸려온다.
+# architect/worker 와 서드파티 플러그인 에이전트 수십 개가 있어 전부 페이로드로 딸려온다.
 echo "▶ agents: ~/.claude/agents → global/agents (repo 소유분만)"
 for f in "${AGENTS_DST}/"*.md; do
   [ -f "$f" ] || continue

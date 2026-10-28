@@ -13,7 +13,6 @@
 #   dev/active/.gitkeep
 #
 # 설치하지 않는 것 (의도적 제외):
-#   - GSD / Gstack (별도 서드파티 스킬 팩 — 필요 시 각자 설치)
 #   - 강제 다중에이전트 / 3역할 훅 / 페르소나 시뮬레이션
 #   - PM2 / git worktree 자동화 (필요 시 수동 구성)
 #   - deny 반환 PreToolUse 강제 훅 (본 셋업의 훅은 전부 advisory)

@@ -85,7 +85,7 @@ tags:
 ### Claude Code란?
 - Anthropic의 AI 기반 터미널 코딩 도구
 - 버전은 `claude --version` 으로 확인하고 `claude update` 로 최신을 유지한다 (문서는 특정 버전을 고정하지 않음)
-- Agent Skills, Sub-agents, Hooks, **플러그인**, **메모리**, **Plan Mode**, **공식 스킬 프레임워크(GSD/Superpowers/Gstack)** 등 강력한 기능 제공
+- Agent Skills, Sub-agents, Hooks, **플러그인**, **메모리**, **Plan Mode** 등 강력한 기능 제공
 - Opus / Fable / Sonnet 계열은 1M 컨텍스트, Haiku 계열은 200K 컨텍스트 (현행 수치는 공식 모델 문서 확인)
 
 | 모델 | 별칭 | 컨텍스트 | 비고 |
