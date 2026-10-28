@@ -78,7 +78,7 @@ cd Claude-Code-Universal-Environment-Setup
 | Agent Skills 예시 모음 | `--with-examples` 옵트인 |
 | PM2 백엔드 디버깅 | `--with-pm2` 옵트인 (템플릿 복사 + pm2-hooks 병합) |
 | verify-hooks settings 병합 | `--with-verify-hooks` 옵트인 |
-| codex 플러그인·login, MCP 시크릿, GSD/Gstack, pm2-logrotate | POST-INSTALL 체크리스트 수동 |
+| codex 플러그인·login, MCP 시크릿, pm2-logrotate | POST-INSTALL 체크리스트 수동 |
 | 실행형 훅 4종 (stop 자가검증·build-checker·post-tool-failure·service-health-check) | 루트 직접 → `.claude/hooks/` (파일은 항상, 배선은 옵트인 — 아래 참조) |
 
 ## Sync From Live (설치 전 역동기화)
@@ -156,6 +156,14 @@ manifest 소유분에 한해 stale sweep 으로 정리된다 (아래 '업스트�
   요청하지 않았을 뿐 업스트림에는 그대로 있는데도요.
 - 관리 접두(`rules/`, `skills/`, `docs/claude-code-setup/`, `.claude/{skills,agents,commands,hooks,settings-fragments}/`,
   `docs/templates/pm2/`) 밖의 항목은 아예 대상이 아닙니다 — 위임 설치기와 사용자 파일을 보호합니다.
+
+### 서드파티 스킬 팩 skillOverrides 은퇴 (2026-10)
+
+GSD·Gstack 스킬 팩은 더 이상 지원·권장하지 않으며, `skill-overrides.json` 에서 해당 키를 뺐습니다.
+`skillOverrides` 는 기존 값이 이기므로(병합하지 않음) **이미 설치된 settings.json 의 키는 그대로 남고**,
+설치기는 사용자 소유 스킬을 지우지 않습니다. 남은 `~/.claude/skills/gsd-*`·`gstack*` 은 직접 제거하세요 —
+새로 설치한 환경에서는 override 가 없어 그 스킬들이 자동 호출 대상이 됩니다.
+라이브 `settings.json` 에 키가 남아 있으면 `scripts/sync-from-live.sh` 가 이 키들을 되살리므로, 동기화 전에 라이브에서도 지우세요.
 
 ### 레거시 `.claude/MODELS.md`
 
@@ -295,7 +303,7 @@ reviewer 는 diff 내용에 유도될 수 있는 LLM 이며, 프롬프트 구분
 ## Out of Scope (v1) — 사유
 
 - **플러그인 내용물** (codex 플러그인 등): 플러그인 마켓플레이스가 소유하는 영역. 설치 명령만 체크리스트로 안내.
-- **네트워크·세션·계정 결합 단계**: `codex login`, MCP `npx` 서버 기동+시크릿 주입, GSD/Gstack 마켓플레이스 설치 — 비대화형 스크립트가 대신할 수 없는 단계이므로 POST-INSTALL 체크리스트로 안내.
+- **네트워크·세션·계정 결합 단계**: `codex login`, MCP `npx` 서버 기동+시크릿 주입 — 비대화형 스크립트가 대신할 수 없는 단계이므로 POST-INSTALL 체크리스트로 안내.
 
 ## Layering Note — 글로벌 스킬 vs 프로젝트 커맨드
 
