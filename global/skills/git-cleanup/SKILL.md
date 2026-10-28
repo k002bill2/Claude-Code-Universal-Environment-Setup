@@ -43,3 +43,4 @@ bash "$S" --help               # 옵션: --base, GIT_CLEANUP_NO_GH 등
 - `~/.claude` 처럼 작업 트리가 곧 라이브 환경인 레포에서는 `apply` 전에 현재 브랜치를 옮기지 않는다.
 - git 2.38+ 필요 (`merge-tree --write-tree`). patch-id 는 공백·행 위치를 무시해 오탐하므로 쓰지 않는다.
 - 기준이 `origin/HEAD` 가 아니면 `--base <branch>` 로 지정한다.
+- 메인 워크트리에 `prune` 서브커맨드가 있는 `scripts/wt.sh`(워크트리별 포트 장부 — 예: APFS)가 있으면 `apply` 끝에 메인 워크트리에서 `wt.sh prune` 을 실행한다. `scan` 헤더의 `# apply 끝에 … prune 도 실행` 줄로 예고되니 3단계 확인 때 함께 보여준다. 끄려면 `GIT_CLEANUP_NO_WT_PRUNE=1`.

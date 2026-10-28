@@ -9,6 +9,7 @@
 # 옵션: --base <branch>  비교 기준 (기본: origin/HEAD → main → master)
 # 환경: GIT_CLEANUP_REMOTE(기본 origin) · GIT_CLEANUP_NO_GH=1(gh 조회 끔)
 #       GIT_CLEANUP_NO_FETCH=1(fetch --prune 생략)
+#       GIT_CLEANUP_NO_WT_PRUNE=1(apply 끝의 scripts/wt.sh prune 생략)
 #
 # 출력 행: <ACTION> <KIND> <NAME> <REASON>
 #   ACTION = DELETE | REMOVE | PRUNE | KEEP,  KIND = local | remote | worktree
@@ -19,6 +20,8 @@
 #   4. gh: 이 브랜치 tip 을 head 로 하는 PR 이 MERGED
 # 삭제는 분류 시점 SHA 를 조건으로 한다 (로컬 update-ref -d, 원격 lease).
 # 보호: 기준 브랜치·main·master·develop·현재 브랜치·dirty/locked 워크트리 브랜치.
+# 저장소 훅: 메인 워크트리에 prune 서브커맨드가 있는 scripts/wt.sh 가 있으면 apply 끝에
+#   메인 워크트리에서 실행한다 (워크트리 포트 장부 정리 — git worktree prune 은 git 메타데이터만 비운다).
 # ============================================================================
 set -u
 
@@ -30,7 +33,7 @@ while [ $# -gt 0 ]; do
         scan|apply) MODE="$1" ;;
         --remote)   DO_REMOTE=1 ;;
         --base)     BASE_ARG="${2:-}"; shift ;;
-        -h|--help)  sed -n '2,22p' "$0"; exit 0 ;;
+        -h|--help)  sed -n '2,25p' "$0"; exit 0 ;;
         *) echo "알 수 없는 인자: $1" >&2; exit 2 ;;
     esac
     shift
@@ -69,6 +72,15 @@ BASE_TREE="$(git rev-parse "$BASE_REF^{tree}")"
 CURRENT="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
 TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+# 메인 워크트리 = worktree list 첫 항목. wt.sh 는 추적 파일이라 링크된 워크트리에도 있지만
+# 그 사본은 다른 브랜치 버전일 수 있다 — 메인 체크아웃 것을 메인에서 실행한다.
+MAIN_WT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+WT_SH=""
+if [ "${GIT_CLEANUP_NO_WT_PRUNE:-0}" != 1 ] && [ -f "${MAIN_WT}/scripts/wt.sh" ] \
+    && grep -qE '^[[:space:]]*prune\)' "${MAIN_WT}/scripts/wt.sh"; then
+    WT_SH="${MAIN_WT}/scripts/wt.sh"
+fi
 
 USE_GH=0
 GH_REPO=""
@@ -216,6 +228,7 @@ if [ "$HAS_REMOTE" = 1 ]; then
 fi
 
 echo "# base: ${BASE_REF}   current: ${CURRENT:-<detached>}   mode: ${MODE}$([ "$DO_REMOTE" = 1 ] && echo ' --remote')"
+[ -n "$WT_SH" ] && echo "# apply 끝에 ${WT_SH} prune 도 실행 (워크트리 포트 장부 정리)"
 printf '%s' "$ROWS"
 [ -n "$ROWS" ] || echo "# 정리할 브랜치·워크트리 없음"
 
@@ -256,5 +269,9 @@ EOF
     fi
 elif printf '%s' "$ROWS" | grep -q '^DELETE  remote'; then
     echo "# 원격 후보는 건너뜀 — 삭제하려면 apply --remote"
+fi
+# 위에서 지운 워크트리(와 그 전에 다른 경로로 지운 것)의 장부 줄을 비운다 — 멱등이라 매 apply 실행
+if [ -n "$WT_SH" ]; then
+    ( cd "$MAIN_WT" && run bash scripts/wt.sh prune ) || FAILED=1
 fi
 exit "$FAILED"

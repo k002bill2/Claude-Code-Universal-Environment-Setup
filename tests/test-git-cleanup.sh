@@ -171,6 +171,39 @@ else
     fail "G29 검증 안 된 원격 커밋이 삭제됨"
 fi
 
+# ── 메인 워크트리에 scripts/wt.sh(prune) 가 있으면 apply 끝에 실행 ──────
+# 스텁은 메인 워크트리(W)에만 둔다 — 링크된 워크트리에서 실행해도 메인 것을 찾아야 한다
+MARK="${SANDBOX_ROOT}/wtsh.called"
+LINKED="${SANDBOX_ROOT}/wt-hook"   # 실행 위치 — 현재 워크트리라 apply 가 지우지 않는다
+g branch wt/hook main; g worktree add "$LINKED" wt/hook
+mkdir -p "$W/scripts"
+cat > "$W/scripts/wt.sh" <<STUB
+case "\$1" in
+  prune) echo "\$(pwd -P) \$*" > "$MARK" ;;
+esac
+STUB
+SCAN="$(cd "$LINKED" && bash "$SCRIPT" scan 2>&1)"
+expect_line "G35 scan 이 wt.sh prune 실행 예정을 알림" '^# .*scripts/wt\.sh prune'
+[ ! -e "$MARK" ] && pass "G36 scan 은 wt.sh 를 실행하지 않음" || fail "G36 scan 이 wt.sh 실행"
+(cd "$LINKED" && bash "$SCRIPT" apply >/dev/null 2>&1)
+if [ -f "$MARK" ] && [ "$(cat "$MARK")" = "$(cd "$W" && pwd -P) prune" ]; then
+    pass "G37 apply 가 메인 워크트리의 wt.sh prune 실행"
+else
+    fail "G37 wt.sh prune 미실행 — marker: $(cat "$MARK" 2>/dev/null || echo '<없음>')"
+fi
+rm -f "$MARK"
+(cd "$W" && GIT_CLEANUP_NO_WT_PRUNE=1 bash "$SCRIPT" apply >/dev/null 2>&1)
+[ ! -e "$MARK" ] && pass "G38 GIT_CLEANUP_NO_WT_PRUNE=1 이면 건너뜀" || fail "G38 opt-out 무시됨"
+printf 'case "$1" in\n  rm) : ;;\nesac\n' > "$W/scripts/wt.sh"   # prune 서브커맨드 없는 무관한 wt.sh
+SCAN="$(cd "$W" && bash "$SCRIPT" scan 2>&1)"
+reject_line "G39 prune 없는 wt.sh 는 알림 없음" 'scripts/wt\.sh prune'
+(cd "$W" && bash "$SCRIPT" apply >/dev/null 2>&1); RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$MARK" ] && pass "G40 prune 없는 wt.sh 는 실행 안 함·exit 0" || fail "G40 exit ${RC}"
+printf 'case "$1" in\n  prune) exit 3 ;;\nesac\n' > "$W/scripts/wt.sh"   # prune 이 실패하는 wt.sh
+(cd "$W" && bash "$SCRIPT" apply >/dev/null 2>&1); RC=$?
+[ "$RC" -ne 0 ] && pass "G41 wt.sh prune 실패는 apply 종료코드에 반영" || fail "G41 prune 실패인데 exit 0"
+rm -rf "$W/scripts"
+
 # ── git 레포 밖에서는 실패 ──────────────────────────────────────────────
 (cd "$SANDBOX_ROOT" && bash "$SCRIPT" scan >/dev/null 2>&1) \
     && fail "G26 레포 밖에서 exit 0" || pass "G26 레포 밖에서 non-zero exit"
