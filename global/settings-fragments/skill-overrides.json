@@ -1,7 +1,5 @@
 {
   "skillOverrides": {
-    "agent-improvement": "off",
-    "agent-observability": "off",
     "computer-use": "user-invocable-only",
     "external-memory": "user-invocable-only",
     "find-skills": "user-invocable-only",
@@ -12,7 +10,6 @@
     "request-refactor-plan": "off",
     "review": "user-invocable-only",
     "slash-command-creator": "user-invocable-only",
-    "subagent-creator": "off",
     "supabase-postgres-best-practices": "off",
     "watch": "off"
   }

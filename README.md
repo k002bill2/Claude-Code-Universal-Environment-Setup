@@ -45,7 +45,7 @@ cd Claude-Code-Universal-Environment-Setup
 │   └── merge-settings.sh       # settings.json 공용 병합 엔진 (jq 우선, node 폴백)
 ├── global/
 │   ├── rules/                  # → ~/.claude/rules/ (관리 파일)
-│   └── skills/                 # → ~/.claude/skills/ (19개, 관리 파일)
+│   └── skills/                 # → ~/.claude/skills/ (7개, 관리 파일)
 ├── project/
 │   ├── skills/                 # → .claude/skills/
 │   ├── agents/                 # → .claude/agents/ (7종)
