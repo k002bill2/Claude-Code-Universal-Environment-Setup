@@ -1766,13 +1766,12 @@ print_checklist() {
     echo "  4. verify-hooks: .claude/settings-fragments/verification-hooks.json 은"
     echo "     --with-verify-hooks 명시 시에만 settings.json 에 병합됩니다"
     echo "     (tsc/lint 자동 훅 — 프로젝트 스택에 맞게 명령 조정 권장)."
-    echo "  5. GSD / Gstack 은 별도 마켓플레이스에서 설치 (본 설치기 범위 밖)."
-    echo "  6. 실행형 훅 4종은 .claude/hooks/ 에 항상 설치됩니다(파일만):"
+    echo "  5. 실행형 훅 4종은 .claude/hooks/ 에 항상 설치됩니다(파일만):"
     echo "       stop-self-check.sh / build-checker.sh  -> --with-verify-hooks 로 배선"
     echo "       post-tool-failure.sh / service-health-check.sh -> --with-pm2 로 배선"
     echo "     전부 advisory(항상 exit 0)이며 jq(PM2 훅은 pm2)가 없으면 무동작합니다."
     if $GUARDRAILS_SKIPPED; then
-        echo "  7. guardrails 훅(위험 Bash 차단·보호 파일 쓰기 차단)은 python3 가 없어"
+        echo "  6. guardrails 훅(위험 Bash 차단·보호 파일 쓰기 차단)은 python3 가 없어"
         echo "     settings.json 병합을 스킵했습니다 — python3 설치 후 재실행하면 자동 병합됩니다."
     fi
     echo ""

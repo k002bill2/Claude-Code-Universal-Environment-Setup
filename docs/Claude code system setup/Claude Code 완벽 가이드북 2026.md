@@ -855,7 +855,6 @@ ls .claude/skills/
 - **Claude Opus 4.7**: 최신 플래그십 모델 (1M 컨텍스트, 4.6 후속)
 - **Claude Sonnet 4.6**: 코딩/에이전트 메인 (유지)
 - **Claude Haiku 4.5**: 경량 (유지, ID: `claude-haiku-4-5-20251001`)
-- **3대 프레임워크 공식화**: GSD/Superpowers/Gstack 모두 공식 스킬 등록 (수동 설치 불필요)
 - **Plan Mode 통합**: ExitPlanMode + AskUserQuestion 정식 도구화
 - **ToolSearch**: deferred 도구 동적 로딩 — 토큰 절약을 위한 lazy loading
 - **/loop, /schedule**: 반복 작업 및 cron 기반 routine

@@ -22,7 +22,7 @@
 |---|---|---|
 | 퍼센트 임계치 | **창 대비 퍼센트로는 구현 불가** → 베이스라인 델타 **59k** 로 대체 (사용자 지정 50~55% 에서 역산) | 실측 baseline 50,905 토큰 (200k 창의 25.5%) |
 | 기능의 신규성 | **신규 아님. 이미 절반 설치돼 있고 배선이 끊겨 있음** | 브리지 파일 0건, 모니터 2종 모두 사문화 |
-| 저장 포맷 | **새로 만들지 않는다.** 기존 경로에 위임 | GSD 주입 문구가 handoff 파일 작성을 금지 |
+| 저장 포맷 | **새로 만들지 않는다.** 기존 경로에 위임 | 구 플러그인 주입 문구가 handoff 파일 작성을 금지 |
 | 번들이 새로 소유할 것 | **트리거 한 가지뿐** (언제 멈출지) | 나머지는 전부 중복 |
 | 리서치 격리 | **소프트 강제만 가능** (하드 차단 불가) | permissions.deny는 서브에이전트도 함께 죽임 |
 | 역할 분배 | `researcher` 신설 + `architect` 도구 축소 + 조언자에 HANDOFF 책임 명문화 | 아래 §8 |
@@ -60,10 +60,10 @@ MCP 서버나 스킬을 추가하면 더 커진다.
 ### 1.2 컨텍스트 모니터 2종이 모두 사문화 상태 (L1 · High)
 
 ```
-~/.claude/hooks/gsd-context-monitor.js      PostToolUse 등록됨. 그러나
+~/.claude/hooks/<구 플러그인 컨텍스트 모니터>.js      PostToolUse 등록됨. 그러나
   └ /tmp|$TMPDIR/claude-ctx-{session}.json 부재 → existsSync 가드에서 매번 즉시 종료
      (실측: /tmp 0건, $TMPDIR 0건)
-     원인: 브리지를 쓰는 쪽이 gsd-statusline.js 인데,
+     원인: 브리지를 쓰는 쪽이 구 플러그인 statusline 스크립트 인데,
            활성 statusLine 은 awesome-statusline.sh 로 교체돼 있음 (settings.json)
 
 ~/.claude/hooks/universal/contextMonitor.js  Stop 등록됨. 그러나
@@ -77,11 +77,11 @@ MCP 서버나 스킬을 추가하면 더 커진다.
 세 건 모두 같은 실패 양식이다 — **감지 수단 없는 규칙은 사문화된다.**
 따라서 이번 추가의 성패는 "규칙을 잘 쓰는 것"이 아니라 "감지가 실제로 살아있게 하는 것"에 달려 있다.
 
-> **2026-07-29 갱신 — 세 건의 처리 결과.** 초판은 "세 번째 모니터를 추가하지 말고 GSD를 되살린다"로
+> **2026-07-29 갱신 — 세 건의 처리 결과.** 초판은 "세 번째 모니터를 추가하지 말고 구 플러그인을 되살린다"로
 > 결론지었으나, 그 대가(R1·R3)가 구조적이라 **번들 소유 훅으로 전환**했다(§3.2). 모니터 총량은
 > 늘지 않는다 — 셋 다 처리됐다:
-> ① `gsd-context-monitor.js` → 무수정·휴면(브리지 파일명이 달라 `existsSync` 가드에서 종료).
->    settings.json 엔트리는 그대로 두므로 GSD 자체 용도로는 계속 살아 있다.
+> ① 구 플러그인 컨텍스트 모니터 훅 → 무수정·휴면(브리지 파일명이 달라 `existsSync` 가드에서 종료).
+>    settings.json 엔트리는 그대로 두므로 구 플러그인 자체 용도로는 계속 살아 있다.
 > ② `hooks/universal/contextMonitor.js` → **조건부 제거.** 횟수 기반이라 토큰 기반 트리거와
 >    개념이 충돌하고 존재하지 않는 `/save-and-compact` 를 권고한다. 단 무조건 지우지 않는다 —
 >    `~/.claude/commands/save-and-compact.md` 가 **없음을 기계적으로 확인**했을 때만 제거하고,
@@ -90,13 +90,13 @@ MCP 서버나 스킬을 추가하면 더 커진다.
 > ③ `external-memory` 스킬의 "Token Threshold (150K)" → 이제 감지 수단이 생겼으므로
 >    Context Budget Trigger 로 문구를 교체했다.
 
-### 1.3 GSD 모니터의 주입 문구가 요청 동작을 금지한다 (L1 · High)
+### 1.3 구 플러그인 모니터의 주입 문구가 요청 동작을 금지한다 (L1 · High)
 
-`gsd-context-monitor.js:120-141` — 되살렸을 때 실제로 모델에게 주입되는 텍스트:
+`<구 플러그인 컨텍스트 모니터>:120-141` — 되살렸을 때 실제로 모델에게 주입되는 텍스트:
 
 | 분기 | CRITICAL 메시지 요지 |
 |---|---|
-| `.planning/STATE.md` 있음 | "Do NOT start new complex work **or write handoff files** — GSD state is already tracked in STATE.md. … run `/gsd:pause-work`" |
+| `.planning/STATE.md` 있음 | "Do NOT start new complex work **or write handoff files** — 구 플러그인 state is already tracked in STATE.md. … run 구 플러그인의 pause-work 커맨드" |
 | 없음 | "Do NOT autonomously save state or write handoff files **unless the user asks**" |
 
 즉 "브리지만 살리면 끝"이 아니다. 그대로 두면 트리거가 살아나는 순간
@@ -104,12 +104,12 @@ MCP 서버나 스킬을 추가하면 더 커진다.
 
 > **실측 정정 (구현 후 Red-Green으로 확인, 2026-07-27):**
 > AOS에 `/Users/…/Agent-System/.planning/STATE.md`가 **실재하는데도 실제로 주입된 것은
-> 비-GSD 분기**였다 — `"…Do NOT autonomously save state or write handoff files **unless the user asks**."`
-> 이후 같은 세션에서 **GSD 분기가 뜬 경우도 관찰**됐다. 즉 분기는 저장소 상태가 아니라
-> **도구 호출 시점의 `data.cwd`에 따라 매번 달라진다**(`isGsdActive`는
-> `path.join(data.cwd, '.planning','STATE.md')`를 본다 — 셸 cwd가 리셋된 호출에서는 비-GSD로 떨어진다).
+> 비-플러그인 분기**였다 — `"…Do NOT autonomously save state or write handoff files **unless the user asks**."`
+> 이후 같은 세션에서 **구 플러그인 분기가 뜬 경우도 관찰**됐다. 즉 분기는 저장소 상태가 아니라
+> **도구 호출 시점의 `data.cwd`에 따라 매번 달라진다**(구 훅의 활성 판정 함수는
+> `path.join(data.cwd, '.planning','STATE.md')`를 본다 — 셸 cwd가 리셋된 호출에서는 비-플러그인으로 떨어진다).
 > **설계에는 영향 없다** — §5의 규칙이 두 분기를 모두 처리하고, 실제로 뜬 쪽은
-> "unless the user asks" 예외를 가진 관대한 분기다. 다만 `isGsdActive` 판정을
+> "unless the user asks" 예외를 가진 관대한 분기다. 다만 구 훅의 활성 판정 함수 판정을
 > **신뢰할 수 있는 분기 조건으로 가정하지 말 것**. 번들 규칙은 주입 문구가 어느 쪽이든
 > `.planning/STATE.md` **존재 여부를 조언자가 직접 확인**해 저장 경로를 고르도록 쓰여 있다.
 
@@ -147,22 +147,22 @@ statusline 훅은 Claude Code가 **매 렌더마다** 호출하고 `context_wind
 | 기존 자산 | 무엇을 저장하나 | 이번 요청과의 관계 |
 |---|---|---|
 | `/wip-save` (AOS) | **코드 상태** (`checkpoint:` WIP 커밋) | 겹치지 않음. 상보적 — HANDOFF와 함께 쓰면 좋음 |
-| `/gsd:pause-work` | GSD 워크플로우 상태 (`.planning/STATE.md`) | **직접 겹침.** AOS에서는 이쪽이 정본 |
+| 구 플러그인의 pause-work 커맨드 | 구 플러그인 워크플로우 상태 (`.planning/STATE.md`) | **직접 겹침.** AOS에서는 이쪽이 정본 |
 | `_workspace/RUN_STATE.md` (AOS 하네스) | 하네스 Phase별 실행 상태 | 하네스 실행 중에 한정. 조언자 세션 일반에는 미적용 |
 | `/session-wrap` (AOS) | 세션 종료 시 문서·패턴·후속작업 정리 | 세션당 1회·수동. 임계 발동용으로는 무거움 |
 | `external-memory` 스킬 | 리서치 플랜·findings·체크포인트 | 트리거가 죽어 있음. 다중 에이전트 전용 |
-| `gstack-context-save/restore` | git 상태 + 결정 + 잔여 작업 | 범용 대안. 플러그인 의존 |
+| 외부 context-save/restore 스킬 | git 상태 + 결정 + 잔여 작업 | 범용 대안. 플러그인 의존 |
 
 **판정: 새 저장 포맷을 만들면 7번째 중복이 된다.** 번들은 트리거만 소유하고, 저장은 위임한다.
 
 ```
-GSD 활성 (.planning/STATE.md 존재)  →  /gsd:pause-work        ← AOS가 여기
-GSD 비활성                          →  HANDOFF.md 1장 작성
+구 플러그인 활성 (.planning/STATE.md 존재)  →  구 플러그인의 pause-work 커맨드        ← AOS가 여기
+구 플러그인 비활성                          →  HANDOFF.md 1장 작성
 어느 쪽이든 코드가 더러우면          →  /wip-save 병행
 ```
 
-이 분기는 GSD 주입 문구와 **정확히 일치**한다 (§1.3의 표를 다시 보면, GSD 분기는 `/gsd:pause-work`를
-지시하고 비-GSD 분기는 "unless the user asks" 예외를 열어둔다 — 번들 CLAUDE.md 규칙이 곧 그 "user asks").
+이 분기는 구 플러그인 주입 문구와 **정확히 일치**한다 (§1.3의 표를 다시 보면, 구 플러그인 분기는 구 플러그인의 pause-work 커맨드를
+지시하고 비-플러그인 분기는 "unless the user asks" 예외를 열어둔다 — 번들 CLAUDE.md 규칙이 곧 그 "user asks").
 모순이 소멸한다.
 
 ---
@@ -207,7 +207,7 @@ BUDGET    := 59_000        # 조언자 세션의 실작업 예산
   rm -f "$TMPDIR/claude-ctx-$SESSION_ID-warned.json"
   ```
 
-  근거: `gsd-context-monitor.js:86`이 읽는 `-warned.json`은 **별도 파일**이고,
+  근거: `<구 플러그인 컨텍스트 모니터>:86`이 읽는 `-warned.json`은 **별도 파일**이고,
   **session_id는 compact를 건너서도 바뀌지 않는다.** 추적하면 —
   compact 직전 `{callsSinceWarn:0, lastLevel:'critical'}` 기록 → 재래치로 delta≈0,
   합성 remaining=100 → 모니터가 `remaining > WARNING_THRESHOLD` 가드에서 종료(파일 미갱신) →
@@ -217,7 +217,7 @@ BUDGET    := 59_000        # 조언자 세션의 실작업 예산
 ### 3.2 번들이 자기 훅을 소유한다 (2026-07-29 전환)
 
 > **이전 설계(폐기):** 브리지가 `remaining_percentage := 100 - delta*100/78_666` 을 **합성**해
-> GSD 플러그인 소유 `gsd-context-monitor.js`(≤35 WARNING, ≤25 CRITICAL)에 실어 보냈다.
+> 구 플러그인 소유 컨텍스트 모니터 훅(≤35 WARNING, ≤25 CRITICAL)에 실어 보냈다.
 > 훅 0개·`settings.json` 무수정이 대가였지만 두 가지를 지불했다 —
 > **(a) R1**: 플러그인 업데이트로 임계치·스키마·메시지가 바뀌면 조용히 깨진다.
 > **(b) R3**: 주입문의 `Usage at X%` 가 창 사용률이 아니라 예산 소진율이라, 상태줄(25%)과
@@ -266,20 +266,20 @@ CONTEXT BUDGET WARNING: 세션 시작 대비 +51,133 토큰 사용 (컨텍스트
 **`.planning/STATE.md` 존재 여부는 훅이 판정하지 않는다** — §1.3 실측 정정대로 `data.cwd` 가
 도구 호출마다 달라져 신뢰할 수 없다. 조언자가 직접 확인하도록 **문구로만** 지시한다.
 
-**GSD 훅은 건드리지 않는다.** 브리지 파일명이 `claude-ctx-advisor-{sid}.json` 으로 바뀌면
-`gsd-context-monitor.js` 는 `existsSync` 가드에서 종료 — 이 변경 이전의 **원래 휴면 상태**로
-자연히 돌아간다. `settings.json` 의 GSD 엔트리는 그대로 둔다. 구 배선이 남긴 잔여 파일
+**구 플러그인 훅은 건드리지 않는다.** 브리지 파일명이 `claude-ctx-advisor-{sid}.json` 으로 바뀌면
+구 플러그인 컨텍스트 모니터 훅은 `existsSync` 가드에서 종료 — 이 변경 이전의 **원래 휴면 상태**로
+자연히 돌아간다. `settings.json` 의 구 플러그인 엔트리는 그대로 둔다. 구 배선이 남긴 잔여 파일
 (`claude-ctx-{sid}.json`·`-base`·`-prev`·`-warned.json`)은 **매 렌더 무조건**
 **정확한 이름으로만** 제거한다(글롭 금지 — 다른 세션 파일을 휩쓸지 않기 위해서다).
 
 > **왜 재래치 경로가 아니라 무조건인가 (실측 근거).** 초안은 "첫 렌더"의 근사치로 재래치 경로에
 > 걸었으나, 업그레이드 시점에 **이미 advisor 파일이 있던 세션**은 재래치가 발생하지 않아
-> 구 브리지가 살아남는다. 그 상태에서 GSD 훅에 세션을 먹이면 실제로 주입된다 —
+> 구 브리지가 살아남는다. 그 상태에서 구 플러그인 훅에 세션을 먹이면 실제로 주입된다 —
 > `CONTEXT CRITICAL: Usage at 80%. Remaining: 20%.` (낡은 합성값). 이 기능이 없애려던 바로 그
 > 혼동이 되살아난다. 불변식을 **"advisor 렌더가 한 번이라도 돌면 구 파일은 없다"** 로 바꿨다.
 > 비용은 렌더당 `rm -f` 1회(리터럴 4개)로, 이미 매 렌더 수행하는 `printf` 와 같은 수준이다.
 >
-> 남는 한계: **죽은 세션**의 구 파일은 렌더가 다시 돌지 않으므로 남는다. GSD 훅의 60초
+> 남는 한계: **죽은 세션**의 구 파일은 렌더가 다시 돌지 않으므로 남는다. 구 플러그인 훅의 60초
 > staleness 가드가 걸러내므로 무해하며, 정리하려면 수동 삭제가 필요하다.
 
 **대가 (정직하게):** `install.sh` 가 텍스트 삽입기에서 **JSON 병합기로 승격**된다(§7 표의
@@ -306,7 +306,7 @@ advisor-context-budget.js  ← 번들 소유. install.sh 가 생성 + settings.j
    ▼
 ~/.claude/CLAUDE.md 번들 블록의 규칙이 대응을 규정 (§6)
 
-gsd-context-monitor.js   ← 무수정·미사용. 브리지 파일명이 달라 existsSync 가드에서 종료(휴면)
+구 플러그인 컨텍스트 모니터 훅   ← 무수정·미사용. 브리지 파일명이 달라 existsSync 가드에서 종료(휴면)
 ```
 
 **대상 스크립트가 만족해야 할 앵커 2종 (수동 삽입 시에도 동일):**
@@ -339,14 +339,14 @@ stdin 을 다른 변수명으로 받는 statusline 을 쓴다면, 위 블록의 
 
 ---
 
-## 5. GSD 주입 문구와의 정합 (§1.3 해소)
+## 5. 구 플러그인 주입 문구와의 정합 (§1.3 해소)
 
 ```
-주입: "…Do NOT write handoff files — GSD state is already tracked in STATE.md.
-       Inform the user so they can run /gsd:pause-work…"
+주입: "…Do NOT write handoff files — 구 플러그인 state is already tracked in STATE.md.
+       Inform the user so they can run 구 플러그인의 pause-work 커맨드…"
 
-번들 규칙(대응): GSD 활성이면 handoff를 쓰지 않는다. /gsd:pause-work 를 제안한다.
-                 GSD 비활성이면 HANDOFF.md 를 쓴다 (= 주입문의 "unless the user asks" 충족).
+번들 규칙(대응): 구 플러그인 활성이면 handoff를 쓰지 않는다. 구 플러그인의 pause-work 커맨드 를 제안한다.
+                 구 플러그인 비활성이면 HANDOFF.md 를 쓴다 (= 주입문의 "unless the user asks" 충족).
 ```
 
 두 지시가 **같은 방향을 가리키므로** 모델이 어느 쪽을 따를지 고민할 여지가 없다.
@@ -378,7 +378,7 @@ compact 후 잔존:  베이스라인 51k (시스템·CLAUDE.md·스킬·도구�
 
 | 안 | settings.json | 새 훅 | install.sh 증분 | 위험 |
 |---|---|---|---|---|
-| 초판 채택안 (폐기) | 무수정 | 0개 | 마커 삽입 함수 1개 ≈ 40줄 | 낮음. 단 **GSD 내부 구현에 의존**(R1) + 숫자 의미 왜곡(R3) |
+| 초판 채택안 (폐기) | 무수정 | 0개 | 마커 삽입 함수 1개 ≈ 40줄 | 낮음. 단 **구 플러그인 내부 구현에 의존**(R1) + 숫자 의미 왜곡(R3) |
 | **전용 훅 신설 (2026-07-29 채택)** | **수정** — 기존 이벤트·Orca 항목을 보존하는 멱등 JSON 병합 | 1개 | ≈ 190줄 (훅 heredoc + 병합 + 게이트) | 중간. 아래 규율로 방어 |
 
 초판이 쌌던 이유는 "이미 등록된 훅에 데이터를 흘려보내기만" 했기 때문이고, 그 대가가 R1·R3였다.
@@ -410,7 +410,7 @@ compact 후 잔존:  베이스라인 51k (시스템·CLAUDE.md·스킬·도구�
 | 로컬 압축 — 코드베이스·로그·파일 | `analyzer` | haiku | **경계 축소: 로컬 전용 명시** |
 | **외부 조사 — 웹·MCP·라이브러리 문서** | **`researcher` (신설)** | **sonnet** | **신규** |
 | 검증 — 리뷰·적대적 검토 | Codex | — | 변경 없음 |
-| 컨텍스트 예산 감시 | statusline 브리지 → GSD 모니터 | — | **신규 배선** |
+| 컨텍스트 예산 감시 | statusline 브리지 → 구 플러그인 모니터 | — | **신규 배선** |
 
 ### 8.2 `researcher` 신설이 필요한 이유
 
@@ -481,7 +481,7 @@ statusline은 **메인 세션에만** 렌더링된다 → 서브에이전트 컨
 세션 시작 시점 대비 +59k 토큰을 쓰면 새 작업을 시작하지 않는다.
 컨텍스트 경고가 주입되면(WARNING/CRITICAL) 즉시 다음을 한다:
 1. 진행 중 작업을 자연스러운 지점에서 마무리
-2. 상태 저장 — `.planning/STATE.md` 있으면 `/gsd:pause-work` 제안,
+2. 상태 저장 — `.planning/STATE.md` 있으면 구 플러그인의 pause-work 커맨드 제안,
    없으면 HANDOFF.md 작성(결정·완료기준·검증상태·다음 단계). 코드가 더러우면 `/wip-save` 병행
 3. 새 세션 권고 (compact보다 우선 — 남길 것을 조언자가 직접 고를 수 있다)
 저장 포맷을 새로 만들지 않는다. 위 경로 중 하나를 쓴다.
@@ -498,8 +498,8 @@ statusline은 **메인 세션에만** 렌더링된다 → 서브에이전트 컨
 
 | # | 항목 | 수준 | 비고 |
 |---|---|---|---|
-| R1 | ~~GSD 플러그인 내부 의존~~ | **해소됨** (2026-07-29) | 번들이 `advisor-context-budget.js` 를 **직접 소유**한다. 임계치·브리지 스키마·메시지가 전부 번들 안에 있어 GSD 업데이트의 영향을 받지 않는다. 버전 핀 대조(`GSD_HOOK_PIN`)도 의존이 사라져 제거했다 |
-| R2 | ~~GSD가 컨텍스트 경고를 끌 수 있음~~ | **해소됨** (R1과 동반) | `.planning/config.json` 의 `hooks.context_warnings=false` 는 GSD 훅만 끈다. 번들 훅은 그 설정을 읽지 않는다(§3.2 — `data.cwd` 를 신뢰할 수 없어 의도적으로 미구현) |
+| R1 | ~~구 플러그인 내부 의존~~ | **해소됨** (2026-07-29) | 번들이 `advisor-context-budget.js` 를 **직접 소유**한다. 임계치·브리지 스키마·메시지가 전부 번들 안에 있어 구 플러그인 업데이트의 영향을 받지 않는다. 버전 핀 대조(구 훅 버전 핀 상수)도 의존이 사라져 제거했다 |
+| R2 | ~~구 플러그인가 컨텍스트 경고를 끌 수 있음~~ | **해소됨** (R1과 동반) | `.planning/config.json` 의 `hooks.context_warnings=false` 는 구 플러그인 훅만 끈다. 번들 훅은 그 설정을 읽지 않는다(§3.2 — `data.cwd` 를 신뢰할 수 없어 의도적으로 미구현) |
 | R3 | ~~합성 `remaining_percentage`의 의미 왜곡~~ | **해소됨** (2026-07-29) | 합성 매핑을 폐기하고 브리지가 사실값(`delta`/`window_pct`)만 기록한다. 메시지가 예산 델타와 창 사용률을 **분리 표기**하고 "고갈 아님"을 명시한다 |
 | R3b | **설치기가 `settings.json` 에 쓴다** | Medium | R1/R3 해소의 대가. 파싱→수정→재출력(문자열 치환 금지) · 백업 · 원자적 `mv` · 유효성 게이트(실패 시 백업 복원 후 `exit 1`) · 커맨드 부분문자열 기준 멱등으로 방어한다. `python3`/`jq` 둘 다 없으면 경고 후 skip |
 | R4 | 리서치 격리는 소프트 강제 | Medium | 하드 차단 수단 미확인 (§1.5, L3) |
@@ -521,7 +521,7 @@ statusline은 **메인 세션에만** 렌더링된다 → 서브에이전트 컨
 **범위 (2개 파일)**
 1. `install.sh` — statusline 마커 삽입 함수 추가(baseline 래치 + 재래치 시 `-warned.json` 삭제 포함)
    + `researcher.md` heredoc 추가 + `architect.md` tools에서 WebSearch/WebFetch 제거
-   + CLAUDE.md 블록에 §9 문안 추가 + GSD 훅 버전 기록/불일치 경고
+   + CLAUDE.md 블록에 §9 문안 추가 + 구 플러그인 훅 버전 기록/불일치 경고
 2. `README_조언자-작업자-전략.md` — 역할표(§8.1), 예외 카브아웃(§8.5), 배선도(§4) 반영
    > Fable→Opus 이관은 **이미 완료**돼 있다(워킹트리 실측: `install.sh` fable 0건,
    > README 잔존 3건은 과거 실험 각주·별칭 목록으로 의도적). 건드리지 말 것.
@@ -535,11 +535,11 @@ statusline은 **메인 세션에만** 렌더링된다 → 서브에이전트 컨
 
   | 단계 | 조작 | 기대 |
   |---|---|---|
-  | GREEN | 브리지 파일에 `remaining_percentage: 20` 강제 기록 | 다음 도구 호출 후 컨텍스트에 `CONTEXT CRITICAL` **문자열이 실제로 등장** (구 GSD 훅 메시지 — 현행은 `CONTEXT BUDGET …`) |
+  | GREEN | 브리지 파일에 `remaining_percentage: 20` 강제 기록 | 다음 도구 호출 후 컨텍스트에 `CONTEXT CRITICAL` **문자열이 실제로 등장** (구 플러그인 훅 메시지 — 현행은 `CONTEXT BUDGET …`) |
   | RED | 브리지 파일 삭제 | 경고가 사라짐 |
 
   근거: §1.2의 실패는 "훅은 등록됐는데 파일이 없었다"였다. 거울상 실패(파일은 있는데
-  GSD 업데이트로 리더가 사라짐 / R2의 `context_warnings:false` / matcher 불일치)는
+  구 플러그인 업데이트로 리더가 사라짐 / R2의 `context_warnings:false` / matcher 불일치)는
   **파일 존재 확인만으로는 통과하고 죽은 채로 출하된다.** RED 단계 없이는 주입과 우연을 구분할 수 없다.
 - `/agents`에 `researcher` 노출 확인
 - settings.json **무변경** 확인 (md5 비교)
@@ -569,6 +569,6 @@ print('baseline',rows[0],'now',rows[-1],'delta',rows[-1]-rows[0])" "$TR"
 # 브리지 사문화 확인
 ls $TMPDIR/claude-ctx-*.json /tmp/claude-ctx-*.json 2>/dev/null || echo "브리지 없음 = 모니터 미동작"
 
-# GSD 분기 판정
-ls .planning/STATE.md 2>/dev/null && echo "GSD 분기" || echo "비-GSD 분기"
+# 구 플러그인 분기 판정
+ls .planning/STATE.md 2>/dev/null && echo "구 플러그인 분기" || echo "비-플러그인 분기"
 ```
