@@ -1168,15 +1168,6 @@ if [ -n "$__ctx_sid" ]; then
   # ${TMPDIR:-/tmp} 만 보면 TMP·TEMP 만 설정된 환경에서 브리지는 /tmp 에 쓰고 훅은 $TMP 를 읽어
   # 메트릭이 영영 만나지 않는다 → 모든 컨텍스트 예산 경고가 조용히 억제된다.
   __ctx_dir="${TMPDIR:-${TMP:-${TEMP:-/tmp}}}"; __ctx_dir="${__ctx_dir%/}"
-  # 구 배선(외부 플러그인 훅) 잔여 파일 정리 — '사용량 가드보다 앞'이어야 한다.
-  # 업그레이드 직후 첫 렌더가 CURRENT_USAGE=null 이거나 토큰 합이 0 이면 아래 가드 안쪽에
-  # 도달하지 못하는데, 그 사이 구 플러그인 훅이 남은 claude-ctx-{sid}.json 을 TTL(60초) 동안 읽어
-  # 이번 마이그레이션이 없애려던 '낡은 경고'를 주입한다.
-  # 글롭이 아니라 정확한 이름만 지운다 — 다른 세션이나 advisor 파일을 휩쓸지 않는다.
-  rm -f "${__ctx_dir}/claude-ctx-${__ctx_sid}.json" \
-        "${__ctx_dir}/claude-ctx-${__ctx_sid}-base" \
-        "${__ctx_dir}/claude-ctx-${__ctx_sid}-prev" \
-        "${__ctx_dir}/claude-ctx-${__ctx_sid}-warned.json" 2>/dev/null || true
 fi
 if [ -n "$__ctx_sid" ] && [ "$CURRENT_USAGE" != "null" ]; then
   __ctx_now=$(printf '%s' "$CURRENT_USAGE" | jq -r '(.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0)' 2>/dev/null || true)
@@ -1541,7 +1532,7 @@ fi
 # 순서가 중요하다: 훅 파일 → settings.json 등록 → (성공했을 때만) statusline 브리지 전환.
 #
 # 브리지를 먼저 바꾸면, 등록이 실패했을 때 '컨텍스트 경고가 전부 꺼진 상태'가 만들어진다:
-#   새 브리지는 claude-ctx-advisor-*.json 만 쓰고 구 메트릭까지 지우는데,
+#   새 브리지는 claude-ctx-advisor-*.json 만 쓰는데,
 #   그 값을 읽을 advisor 훅은 미등록이고, 남아있는 구 플러그인 훅이 찾는 파일은 아무도 안 쓴다.
 #   → 설치는 "성공"으로 끝나고 감지 수단만 사라진다. 이 작업이 고치려던 실패 양식 그 자체다.
 # 등록에 실패하면 statusline 을 건드리지 않는다 — 업그레이드면 구 브리지가 계속 동작하고,
