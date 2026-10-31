@@ -1,0 +1,14 @@
+# scripts/sync-exclude.txt — sync-from-live.sh 가 건너뛰는 개인 항목 (라이브 → repo 로 끌어오지 않음)
+# 형식: 한 줄에 하나, <종류>:<이름>. 종류 = rule(파일명) | override(skillOverrides 키) | skill(디렉터리명) | agent(파일명)
+# 사용자 로컬 전용 목록은 ~/.claude/.sync-exclude.local (같은 형식, 있으면 합친다). --no-exclude 로 전부 무시.
+
+# 개인 pstack 모델·예산 설정 — 사용자별 모델 가용성에 묶여 있어 설치기 배포 대상이 아니다.
+rule:pstack-models.md
+# 개인 브라우저 정책(ego-browser 전용) — 이하 4개 키는 한 사용자의 브라우저 선택이다.
+override:aside-browser
+# 개인 브라우저 정책 — 내장 브라우저 끄기.
+override:built-in-browser
+# 개인 브라우저 정책 — Chrome 브라우저 끄기.
+override:chrome-browser
+# 개인 브라우저 정책 — ego-browser 켜기 (설치기는 ego-browser 를 배포하지 않는다).
+override:ego-browser
