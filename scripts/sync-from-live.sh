@@ -30,9 +30,13 @@ set -euo pipefail
 #   - 라이브에서 삭제된 스킬을 repo 에서 자동 삭제하지 않는다 — 경고만 출력.
 #   - repo 에 없는 라이브 스킬을 새로 추적하지 않는다 (플러그인/개인 실험 다수).
 #
-# Usage: scripts/sync-from-live.sh [--dry-run]
+# 개인 제외: scripts/sync-exclude.txt (+ 있으면 ~/.claude/.sync-exclude.local) 의
+#   rule:/override:/skill:/agent: 항목은 건너뛴다 — 개인 설정이 public repo 로 새지 않게.
+#
+# Usage: scripts/sync-from-live.sh [--dry-run] [--no-exclude]
 #          [--write-claude-block] [--write-hook-blocks] [--write-blocks]
 #        --write-blocks 는 위 두 쓰기 플래그를 모두 켠다.
+#        --no-exclude 는 개인 제외 목록을 무시한다(전부 동기화).
 # 제약: bash 3.2 호환, 모든 경로 인용. jq 없으면 3·4·5 는 스킵(경고).
 # ============================================================================
 
@@ -43,24 +47,39 @@ AGENTS_DST="${SCRIPT_DIR}/global/agents"
 SKILLS_DST="${SCRIPT_DIR}/global/skills"
 OVERRIDES_DST="${SCRIPT_DIR}/global/settings-fragments/skill-overrides.json"
 ADVISOR_INSTALLER="${SCRIPT_DIR}/docs/codex-advisor-worker-bundle/install.sh"
+EXCLUDE_FILE="${SCRIPT_DIR}/scripts/sync-exclude.txt"
+EXCLUDE_LOCAL="${CLAUDE_HOME}/.sync-exclude.local"
 
 DRY_RUN=false
 WRITE_CLAUDE_BLOCK=false
 WRITE_HOOK_BLOCKS=false
+NO_EXCLUDE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)            DRY_RUN=true; shift ;;
+    --no-exclude)         NO_EXCLUDE=true; shift ;;
     --write-claude-block) WRITE_CLAUDE_BLOCK=true; shift ;;
     --write-hook-blocks)  WRITE_HOOK_BLOCKS=true; shift ;;
     # 우산 플래그: heredoc 스플라이스 3종을 한 번에 켠다.
     --write-blocks)       WRITE_CLAUDE_BLOCK=true; WRITE_HOOK_BLOCKS=true; shift ;;
     -h|--help)
-      sed -n '4,36p' "${BASH_SOURCE[0]}"; exit 0 ;;
+      sed -n '4,40p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
 note() { printf '  %s\n' "$1"; }
+
+# 개인 제외 목록 — 개행 구분 "<종류>:<이름>" (bash 3.2: 연관 배열 대신 문자열 + grep -x).
+EXCLUDES=""
+if ! $NO_EXCLUDE; then
+  for ef in "$EXCLUDE_FILE" "$EXCLUDE_LOCAL"; do
+    [ -f "$ef" ] || continue
+    EXCLUDES="${EXCLUDES}$(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$ef" | grep -v '^$' || true)
+"
+  done
+fi
+is_excluded() { printf '%s\n' "$EXCLUDES" | grep -qxF "$1:$2"; }
 
 # ── 1. rules ─────────────────────────────────────────────────────────────
 echo "▶ rules: ~/.claude/rules → global/rules"
@@ -69,7 +88,9 @@ if [ -d "${CLAUDE_HOME}/rules" ]; then
     [ -f "$f" ] || continue
     name="$(basename "$f")"
     dst="${RULES_DST}/${name}"
-    if [ -f "$dst" ] && cmp -s "$f" "$dst"; then
+    if is_excluded rule "$name"; then
+      note "SKIP(개인 제외): ${name}"
+    elif [ -f "$dst" ] && cmp -s "$f" "$dst"; then
       note "UNCHANGED: ${name}"
     elif $DRY_RUN; then
       note "[DRY RUN] Would sync: ${name}"
@@ -101,7 +122,9 @@ for f in "${AGENTS_DST}/"*.md; do
   [ -f "$f" ] || continue
   name="$(basename "$f")"
   src="${CLAUDE_HOME}/agents/${name}"
-  if [ ! -f "$src" ]; then
+  if is_excluded agent "$name"; then
+    note "SKIP(개인 제외): ${name}"
+  elif [ ! -f "$src" ]; then
     note "WARN: ${name} 이 라이브에 없음 — 사용자가 삭제했다면 repo 에서도 제거하세요 (자동 삭제 안 함)."
   elif cmp -s "$src" "$f"; then
     note "UNCHANGED: ${name}"
@@ -119,7 +142,9 @@ for d in "${SKILLS_DST}/"*/; do
   [ -d "$d" ] || continue
   name="$(basename "${d%/}")"
   src="${CLAUDE_HOME}/skills/${name}"
-  if [ -L "$src" ]; then
+  if is_excluded skill "$name"; then
+    note "SKIP(개인 제외): ${name}"
+  elif [ -L "$src" ]; then
     note "SKIP(심볼릭링크): ${name} — 설치기 소유 부적합. 페이로드에서 제거를 검토하세요."
   elif [ ! -d "$src" ]; then
     note "WARN: ${name} 이 라이브에 없음 — 사용자가 삭제했다면 repo 에서도 제거하세요 (자동 삭제 안 함)."
@@ -144,14 +169,19 @@ elif [ ! -f "${CLAUDE_HOME}/settings.json" ]; then
 elif ! jq -e '.skillOverrides' "${CLAUDE_HOME}/settings.json" >/dev/null 2>&1; then
   note "스킵: 라이브에 skillOverrides 키 없음 (빈 스냅샷으로 덮지 않는다)"
 else
-  NEW_SNAP="$(jq '{skillOverrides}' "${CLAUDE_HOME}/settings.json")"
+  # 제외 키는 라이브 스냅샷에서 지운 뒤 비교·기록한다. del 은 나머지 키 순서를 보존한다.
+  EX_KEYS="$(printf '%s\n' "$EXCLUDES" | sed -n 's/^override://p' | jq -R . | jq -s -c .)"
+  NEW_SNAP="$(jq --argjson ex "$EX_KEYS" '{skillOverrides} | del(.skillOverrides[$ex[]])' "${CLAUDE_HOME}/settings.json")"
+  EX_N="$(jq --argjson ex "$EX_KEYS" '[.skillOverrides | keys[] | select(. as $k | $ex | index($k))] | length' "${CLAUDE_HOME}/settings.json")"
+  EX_NOTE=""
+  [ "$EX_N" -gt 0 ] && EX_NOTE=" (개인 제외 ${EX_N}개)"
   if [ -f "$OVERRIDES_DST" ] && [ "$NEW_SNAP" = "$(cat "$OVERRIDES_DST")" ]; then
-    note "UNCHANGED: skill-overrides.json"
+    note "UNCHANGED: skill-overrides.json${EX_NOTE}"
   elif $DRY_RUN; then
-    note "[DRY RUN] Would sync: skill-overrides.json ($(printf '%s' "$NEW_SNAP" | jq '.skillOverrides | length')개 항목)"
+    note "[DRY RUN] Would sync: skill-overrides.json ($(printf '%s' "$NEW_SNAP" | jq '.skillOverrides | length')개 항목)${EX_NOTE}"
   else
     printf '%s\n' "$NEW_SNAP" > "$OVERRIDES_DST"
-    note "SYNCED: skill-overrides.json ($(jq '.skillOverrides | length' "$OVERRIDES_DST")개 항목)"
+    note "SYNCED: skill-overrides.json ($(jq '.skillOverrides | length' "$OVERRIDES_DST")개 항목)${EX_NOTE}"
   fi
 fi
 
