@@ -109,6 +109,12 @@ heredoc 블록 3종(스플라이스는 구조를 깨뜨릴 수 있어 기본은 
 (파괴적 결정은 사람이 한다). 페이로드에서 스킬을 제거하면 이후 업그레이드에서
 manifest 소유분에 한해 stale sweep 으로 정리된다 (아래 '업스트림에서 제거된 자산').
 
+**개인 항목 제외.** 설치기 범위 밖인 개인 설정(개인 pstack 모델 rule, 개인 브라우저 정책
+override 키 등)은 `scripts/sync-exclude.txt` 에 `rule:<파일명>` / `override:<키>`
+(`skill:<이름>`, `agent:<파일명>` 도 가능) 형식으로 적어 두며, 동기화가 `SKIP(개인 제외)` 로 건너뛴다.
+나만의 제외 항목은 커밋하지 말고 `~/.claude/.sync-exclude.local` 에 같은 형식으로 적으면 합쳐진다.
+제외를 끄고 전부 동기화하려면 `--no-exclude`.
+
 ## Install Policy (파일 정책 · 멱등성)
 
 세 부류로 나뉩니다:
@@ -163,7 +169,7 @@ GSD·Gstack 스킬 팩은 더 이상 지원·권장하지 않으며, `skill-over
 `skillOverrides` 는 기존 값이 이기므로(병합하지 않음) **이미 설치된 settings.json 의 키는 그대로 남고**,
 설치기는 사용자 소유 스킬을 지우지 않습니다. 남은 `~/.claude/skills/gsd-*`·`gstack*` 은 직접 제거하세요 —
 새로 설치한 환경에서는 override 가 없어 그 스킬들이 자동 호출 대상이 됩니다.
-라이브 `settings.json` 에 키가 남아 있으면 `scripts/sync-from-live.sh` 가 이 키들을 되살리므로, 동기화 전에 라이브에서도 지우세요.
+이 키들은 라이브 `settings.json` 에서도 이미 제거되었습니다. 다시 생기면 `scripts/sync-from-live.sh` 가 저장소로 되살리므로, 라이브에서 지우거나 `~/.claude/.sync-exclude.local` 에 `override:<키>` 로 제외하세요.
 
 ### 레거시 `.claude/MODELS.md`
 
