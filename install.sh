@@ -1872,10 +1872,10 @@ advisor_block_drifted() {
 advisor_drift_preflight() {
     advisor_block_drifted || return 0
     if $FORCE_GLOBAL; then
-        log_warn "~/.claude/CLAUDE.md 의 advisor 번들 블록이 저장소 heredoc 과 다릅니다 — --force-global 로 진행(라이브 블록은 덮어써짐)."
+        log_warn "advisor 번들 블록(~/.claude/CLAUDE.md)이 저장소 heredoc 과 다릅니다 — --force-global 로 진행(라이브 블록은 덮어써짐)."
         return 0
     fi
-    log_error "~/.claude/CLAUDE.md 의 advisor 번들 블록이 저장소 heredoc 과 다릅니다."
+    log_error "advisor 번들 블록(~/.claude/CLAUDE.md)이 저장소 heredoc 과 다릅니다."
     log_error "advisor 위임 설치기는 저널 밖에서 이 블록을 덮어써 라이브 편집이 사라집니다."
     log_error "먼저 scripts/sync-from-live.sh --write-claude-block 로 역동기화하거나, 덮어써도 되면 --force-global 을 붙이세요."
     exit 1

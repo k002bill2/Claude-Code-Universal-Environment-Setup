@@ -52,7 +52,7 @@ done
 [ "$(cat "$(P k1)/.claude/.install-profile" 2>/dev/null)" = "components=commands,hooks" ] \
     && pass "K1 기록 = components=commands,hooks" \
     || fail "K1 기록 이상: $(cat "$(P k1)/.claude/.install-profile" 2>/dev/null)"
-out_has '~/.claude 쓰기: 아니오' "K1 요약에 ~/.claude 쓰기: 아니오"
+out_has '.claude 쓰기: 아니오' "K1 요약에 ~/.claude 쓰기: 아니오"
 
 # ── K2: 기록 재사용 (플래그 없이 --project 만) ───────────────────────────
 rm -f "$(P k1)/.claude/commands/check-health.md"
@@ -131,7 +131,7 @@ run_inst "$(H k7r)" --project "$(P k7r)" --components memory-seed; RC=$?
 [ "$RC" -eq 0 ] && pass "K7r 명시 components 는 기록 minimal 을 대체(exit 0)" || fail "K7r exit ${RC}"
 find "$(H k7r)/.claude/projects" -name MEMORY.md 2>/dev/null | grep -q . \
     && pass "K7r memory-seed 설치(명시)" || fail "K7r memory-seed 없음"
-out_has '~/.claude 쓰기: 예' "K7r 요약에 ~/.claude 쓰기: 예"
+out_has '.claude 쓰기: 예' "K7r 요약에 ~/.claude 쓰기: 예"
 
 # ── K8: system-setup 단독 → settings 선생성, model 미주입 ───────────────
 newenv k8
@@ -155,7 +155,7 @@ newenv k9
 run_inst "$(H k9)" --project "$(P k9)" --components global; RC=$?
 [ "$RC" -eq 0 ] && pass "K9 exit 0" || { fail "K9 exit ${RC}"; tail -20 "$OUT"; }
 ls "$(H k9)/.claude/rules/"*.md >/dev/null 2>&1 && pass "K9 rules 설치" || fail "K9 rules 없음"
-out_has '~/.claude 쓰기: 예' "K9 요약에 ~/.claude 쓰기: 예"
+out_has '.claude 쓰기: 예' "K9 요약에 ~/.claude 쓰기: 예"
 hasnt "$(P k9)/.claude/settings.json" "K9 프로젝트 settings 없음"
 
 # ── K10: --profile core + --components examples 합집합 ──────────────────
