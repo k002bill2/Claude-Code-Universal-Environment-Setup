@@ -36,7 +36,52 @@ cd Claude-Code-Universal-Environment-Setup
 - **이미 하네스가 깔린 머신에서는 core/full 을 프로젝트마다 돌리지 마세요.** 글로벌 단계는 무동작이거나, 리포가 라이브보다 낡았으면 구버전으로 롤백합니다(아래 *Sync From Live*). 새 프로젝트는 `minimal` 로 충분합니다.
 - **`git push` 사전 허용 제거(2026-11):** 원격 쓰기는 사람 승인 원칙이라 `cli-orchestration.json` allow 에서 뺐습니다. 재설치 시 설치기가 넣었던 항목만 제거되고, 사용자가 직접 넣은 같은 문자열은 보존됩니다.
 - guardrails 는 일부 위험 패턴을 막는 **보조 가드**이며 사람 승인·샌드박스를 대체하지 않습니다.
-- `--components` 개별 선택과 TTY 메뉴는 2차 예정입니다.
+
+### 개별 선택 (`--components a,b,c`)
+
+`--components` 단독이면 **정확히 그 목록**(+자동 의존)만 설치합니다. `--profile`/`--full` 과 함께 쓰면 **합집합**입니다.
+
+| 키 | 설치물 | `~/.claude` 쓰기 | 의존 |
+|---|---|---|---|
+| `global` | rules·skills·agents·docs·skill-overrides·글로벌 스윕 | 예 | — |
+| `guardrails` | guardrails.json 병합 | 아니오 | python3 (없으면 exit 1) |
+| `permissions` | cli-orchestration.json 병합 | 아니오 | — |
+| `claude-md` | core/full 계열이면 기존 템플릿, 그 외는 `templates/CLAUDE.minimal.md` (이미 있으면 건드리지 않음) | 아니오 | — |
+| `commands` | check-health.md, verify-app.md | 아니오 | — |
+| `commands-auto` | auto.md | 아니오 | — |
+| `agents` / `skills` | project/agents, project/skills | 아니오 | — |
+| `skill-rules` | skill-rules.json | 아니오 | system-setup (없으면 WARN) |
+| `hooks` | .claude/hooks/*.sh 4종 | 아니오 | — |
+| `verify-hooks` | 조각 파일 + 병합 | 아니오 | hooks (자동 추가 + INFO) |
+| `pm2` | 템플릿 + pm2-hooks 병합 | 아니오 | hooks (자동 추가 + INFO) |
+| `system-setup` | 위임 설치기 | 아니오 | settings 선생성 불변식(아래) |
+| `extras` | mcp example·Safety 문서·dev/ gitkeep | 아니오 | — |
+| `memory-seed` | `~/.claude/projects/<slug>/memory/MEMORY.md` | 예 | — |
+| `advisor` | 위임 설치기 | 예 | python3 또는 jq |
+| `examples` | examples/ 스킬·에이전트 | 아니오 | — |
+
+- 알 수 없는 키(또는 빈 목록) → exit 1 + 사용 가능한 키 목록. `cross-review` 는 키가 아닙니다 — `--with-cross-review` 전용이며, 글로벌 단계가 없는 구성(`global` 미포함 components 단독)과는 함께 쓸 수 없습니다(exit 1).
+- 실효 구성이 minimal 기반(`--profile minimal` 또는 기록된 minimal)인데 `global`/`memory-seed`/`advisor` 를 고르면 exit 1 (minimal 배타 규칙과 같은 경로). `--components` 단독으로 글로벌 쓰기 키를 고르는 것은 허용되며 요약에 `~/.claude 쓰기: 예` 가 표시됩니다.
+- **settings 선생성:** `system-setup` 을 고르고 `guardrails`·`permissions` 가 둘 다 없으면 위임 전에 빈 `{}` `.claude/settings.json` 을 만들어 위임 설치기의 신규 템플릿(model 키 주입) 경로를 막습니다. 이미 있으면 건드리지 않습니다.
+- 기록: `.claude/.install-profile` 에 `components=a,b,c` (프로필과 함께면 `profile=` 과 두 줄). 재사용 규칙은 프로필과 같습니다 — 무엇이든 명시하면 기록 전체를 대체합니다.
+- **`full` ≠ 모든 키:** `--profile full` 은 verify-hooks 를 조각 파일만 깔고(병합 없음), pm2 는 템플릿만 깝니다(pm2-hooks 병합 없음). 키 `verify-hooks`/`pm2` 는 병합까지 합니다.
+
+### 첫 설치 메뉴 (TTY)
+
+다음이 **모두** 참일 때만 메뉴를 띄웁니다: `--project` 지정 ∧ `--profile`/`--components`/`--full` 미지정 ∧ `.install-profile` 기록 없음 ∧ stdin 이 TTY ∧ `CI` 환경변수 미설정 ∧ `--yes`/`--non-interactive`/`--dry-run`/`--uninstall` 아님.
+
+```
+1) minimal (기본 — 프로젝트 초기 권장)  2) full  3) 직접 선택  4) core
+```
+
+빈 Enter = 1. 3 은 키 목록을 번호로 보여 주고 번호·이름 쉼표 입력을 받습니다(위 규칙으로 검증). 알 수 없는 선택은 1회 재질문 후 exit 1, 60초 타임아웃/EOF 도 exit 1 입니다 — 조용히 core 로 가지 않습니다. 선택 결과는 기록됩니다. `--yes`/`--non-interactive` 는 메뉴를 건너뛰고 위 미지정 규칙(기록 재사용, 없으면 core+경고)을 따릅니다.
+
+### 글로벌 드리프트 사전 점검
+
+글로벌 단계가 실행될 때(core/full/`global` 키) 쓰기 전에 읽기 전용으로 점검합니다.
+
+- rules·skills: 라이브 파일이 저장소 소스와 다르면 목록을 WARN 으로 출력합니다(“저장소 스냅샷이 라이브보다 뒤처졌을 수 있음 — scripts/sync-from-live.sh 로 역동기화 검토”). manifest 가 사용자 수정을 보존하므로 **차단하지 않습니다**.
+- advisor 위임(`--with-advisor`/`advisor` 키/full): 라이브 `~/.claude/CLAUDE.md` 의 `codex-advisor-worker-bundle` 마커 블록이 저장소 heredoc 과 다르면 **exit 1** 합니다(위임 설치기가 저널 밖에서 덮어쓰기 때문). `--force-global` 을 붙여야만 진행합니다. 라이브가 없으면(새 머신·번들 미설치) 드리프트 없음입니다.
 
 ## Flags
 
@@ -52,8 +97,19 @@ cd Claude-Code-Universal-Environment-Setup
 | `--with-pm2` | PM2 템플릿을 `<project>/docs/templates/pm2/`에 복사 + pm2-hooks 조각을 `settings.json`에 병합 |
 | `--with-verify-hooks` | verify-hooks 조각을 `.claude/settings.json`에 실제 병합 |
 | `--with-cross-review` | **글로벌** Claude↔Codex 교차리뷰 번들을 `~/.claude/hooks/cross-review/`에 설치 + opt-in Stop 가드를 `~/.claude/settings.json`에 병합. **기본 설치와 `--full` 은 파일조차 설치하지 않습니다** (아래 *교차리뷰 게이트*) |
+| `--components LIST` | 쉼표 키 목록 — 단독이면 정확히 그 목록, `--profile`/`--full` 과 함께면 합집합 (위 *개별 선택*) |
+| `--yes` / `--non-interactive` | 첫 설치 메뉴를 띄우지 않음(기록 재사용, 없으면 core+경고) |
+| `--force-global` | advisor 블록 드리프트가 있어도 진행(라이브 블록이 덮어써짐) |
 | `--uninstall` | installer가 소유한 파일과 settings hooks/permissions만 제거 (아래 *Uninstall Policy*) |
 | `-h` / `--help` | 사용법 출력 |
+
+## Orca / git worktree 운영
+
+git worktree·Orca 레인은 **git 추적 파일만** 가집니다. Orca 는 저장소 setup 스크립트(`npm install`/`pnpm install` 등)만 실행하며 미추적 `.claude/` 를 복사하지 않습니다. 그래서 레인에서도 같은 구성을 쓰려면 설치 산출물을 커밋해야 합니다.
+
+- **커밋 권장:** `.claude/settings.json`, `CLAUDE.md`, `.claude/commands/`, `.claude/.install-profile`, `.manifest`, `.claude/.settings-manifest`
+- **커밋하지 않기 권장:** `*.bak*`, `.manifest-backups/`, `.settings-backups/` — 설치기는 `.gitignore` 를 수정하지 않습니다(기존 원칙). 필요하면 직접 추가하세요.
+- **설치·업그레이드는 메인 체크아웃에서만** 실행하고 커밋하세요. 레인(worktree)에서는 `install.sh` 를 실행하지 않습니다 — 레인은 커밋된 결과를 받아 쓰기만 합니다.
 
 ## Directory Structure
 

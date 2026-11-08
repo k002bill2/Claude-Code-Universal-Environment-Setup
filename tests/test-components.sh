@@ -181,4 +181,11 @@ else
     fail "K11 CLAUDE.md 가 없거나 core 템플릿"
 fi
 
+# ── K12 (Codex P2): global 없는 components + --with-cross-review → 쓰기 전 exit 1 ──
+newenv k12
+snap "$(H k12)" k12-home; snap "$(P k12)" k12-proj
+run_inst "$(H k12)" --project "$(P k12)" --components commands --with-cross-review; RC=$?
+[ "$RC" -eq 1 ] && pass "K12 cross-review 가 조용히 무시되지 않음(exit 1)" || fail "K12 exit ${RC}"
+same "$(H k12)" k12-home && same "$(P k12)" k12-proj && pass "K12 쓰기 0" || fail "K12 썼음"
+
 finish

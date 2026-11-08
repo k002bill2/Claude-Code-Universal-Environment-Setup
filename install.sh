@@ -328,6 +328,12 @@ enforce_profile_rules() {
         log_error "components: guardrails 는 python3 훅이라 python3 없이 설치하지 않습니다 (fail-closed)."
         exit 1
     fi
+    # 교차리뷰는 글로벌 단계 안에서 설치된다 — global 없이 고르면 조용히 무시되므로 거부
+    if $WITH_CROSS_REVIEW && [ "$PROFILE" != "minimal" ] && [ "$PROFILE" != "core" ] && \
+       [ "$PROFILE" != "full" ] && ! comp_on global; then
+        log_error "--with-cross-review 는 글로벌 단계에 설치됩니다 — --components 에 global 을 포함하거나 --profile core|full 을 쓰세요."
+        exit 1
+    fi
     [ "$PROFILE" = "minimal" ] || return 0
     comp_on global && bad="${bad} global"
     comp_on memory-seed && bad="${bad} memory-seed"
@@ -1801,6 +1807,80 @@ install_global_cross_review() {
     done
 }
 
+# ──────────────────────────────────────────────────────
+# 글로벌 드리프트 사전 점검 (읽기 전용 — 어떤 쓰기도 하지 않는다)
+#   rules·skills: 라이브가 저장소와 다르면 WARN 만(manifest 가 USER-MODIFIED 를 보존).
+#   advisor: 위임 설치기가 저널 밖에서 덮어쓰는 ~/.claude/CLAUDE.md 마커 블록이
+#            저장소 heredoc 과 다르면 exit 1 (--force-global 로만 진행).
+#            비교 규칙은 scripts/sync-from-live.sh 의 5절과 같다(앵커 1쌍, 블록 내부 줄).
+# ──────────────────────────────────────────────────────
+global_drift_preflight() {
+    local f name d rel live list="" n=0
+    for f in "${SCRIPT_DIR}/global/rules/"*.md; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        live="${CLAUDE_HOME}/rules/${name}"
+        if [ -f "$live" ] && ! cmp -s "$f" "$live"; then
+            list="${list}    ~/.claude/rules/${name}
+"; n=$((n + 1))
+        fi
+    done
+    for d in "${SCRIPT_DIR}/global/skills/"*/; do
+        [ -d "$d" ] || continue
+        d="${d%/}"
+        name="$(basename "$d")"
+        while IFS= read -r -d '' f; do
+            rel="${f#"$d"/}"
+            live="${CLAUDE_HOME}/skills/${name}/${rel}"
+            if [ -f "$live" ] && ! cmp -s "$f" "$live"; then
+                list="${list}    ~/.claude/skills/${name}/${rel}
+"; n=$((n + 1))
+            fi
+        done < <(find "$d" -type f -print0 2>/dev/null)
+    done
+    if [ "$n" -gt 0 ]; then
+        log_warn "글로벌 드리프트 ${n}건 — 라이브가 저장소 소스와 다릅니다 (차단하지 않음, 사용자 수정은 보존):"
+        printf '%s' "$list"
+        log_warn "저장소 스냅샷이 라이브보다 뒤처졌을 수 있음 — scripts/sync-from-live.sh 로 역동기화 검토"
+    fi
+    return 0
+}
+
+# 0 = 드리프트 없음(또는 비교 불가), 1 = 드리프트
+advisor_block_drifted() {
+    local live_md="${CLAUDE_HOME}/CLAUDE.md" inst="$ADVISOR_INSTALLER"
+    local on tn sn en o t s e
+    [ -f "$live_md" ] && [ -f "$inst" ] || return 1
+    on="$(grep -c "<<'CLAUDEMD'" "$inst" || true)"
+    tn="$(grep -c '^CLAUDEMD$' "$inst" || true)"
+    sn="$(grep -c 'codex-advisor-worker-bundle:start' "$live_md" || true)"
+    en="$(grep -c 'codex-advisor-worker-bundle:end' "$live_md" || true)"
+    [ "$sn" = "0" ] && [ "$en" = "0" ] && return 1   # 번들 미설치 — 드리프트 아님
+    if [ "$on" != "1" ] || [ "$tn" != "1" ] || [ "$sn" != "1" ] || [ "$en" != "1" ]; then
+        log_warn "advisor 블록 앵커 비정상(heredoc ${on}/${tn}, 라이브 마커 ${sn}/${en}) — 드리프트로 간주"
+        return 0
+    fi
+    o="$(grep -n "<<'CLAUDEMD'" "$inst" | cut -d: -f1)"
+    t="$(grep -n '^CLAUDEMD$' "$inst" | cut -d: -f1)"
+    s="$(grep -n 'codex-advisor-worker-bundle:start' "$live_md" | cut -d: -f1)"
+    e="$(grep -n 'codex-advisor-worker-bundle:end' "$live_md" | cut -d: -f1)"
+    [ "$s" -lt "$e" ] || { log_warn "advisor 블록 마커 순서 역전 — 드리프트로 간주"; return 0; }
+    [ "$(sed -n "$((s + 1)),$((e - 1))p" "$live_md")" = "$(sed -n "$((o + 1)),$((t - 1))p" "$inst")" ] && return 1
+    return 0
+}
+
+advisor_drift_preflight() {
+    advisor_block_drifted || return 0
+    if $FORCE_GLOBAL; then
+        log_warn "~/.claude/CLAUDE.md 의 advisor 번들 블록이 저장소 heredoc 과 다릅니다 — --force-global 로 진행(라이브 블록은 덮어써짐)."
+        return 0
+    fi
+    log_error "~/.claude/CLAUDE.md 의 advisor 번들 블록이 저장소 heredoc 과 다릅니다."
+    log_error "advisor 위임 설치기는 저널 밖에서 이 블록을 덮어써 라이브 편집이 사라집니다."
+    log_error "먼저 scripts/sync-from-live.sh --write-claude-block 로 역동기화하거나, 덮어써도 되면 --force-global 을 붙이세요."
+    exit 1
+}
+
 install_global() {
     log_info "글로벌 설치: ${CLAUDE_HOME}/"
     local f d name
@@ -2360,6 +2440,9 @@ if $UNINSTALL; then
     exit 0
 fi
 
+# 사전 점검은 어떤 글로벌 쓰기보다 먼저(읽기 전용). advisor 는 차단 가능.
+step_on advisor && advisor_drift_preflight
+step_on global && global_drift_preflight
 step_on global && install_global
 
 if ! $GLOBAL_ONLY && [ -n "$PROJECT_DIR" ]; then
