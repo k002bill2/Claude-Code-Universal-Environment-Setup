@@ -105,7 +105,7 @@ cd Claude-Code-Universal-Environment-Setup
 
 ## Orca / git worktree 운영
 
-git worktree·Orca 레인은 **git 추적 파일만** 가집니다. Orca 는 저장소 setup 스크립트(`npm install`/`pnpm install` 등)만 실행하며 미추적 `.claude/` 를 복사하지 않습니다. 그래서 레인에서도 같은 구성을 쓰려면 설치 산출물을 커밋해야 합니다.
+git worktree·Orca 레인은 **git 추적 파일만** 가집니다. Orca 는 저장소 setup 스크립트(`npm install`/`pnpm install` 등)만 실행하며 미추적 `.claude/` 를 복사하지 않습니다(2026-11-08 실측: 메인 체크아웃의 미추적 `.claude/<파일>`·루트 파일이 `orca worktree create --setup inherit` 로 만든 새 worktree 에 생기지 않음). 그래서 레인에서도 같은 구성을 쓰려면 설치 산출물을 커밋해야 합니다.
 
 - **커밋 권장:** `.claude/settings.json`, `CLAUDE.md`, `.claude/commands/`, `.claude/.install-profile`, `.manifest`, `.claude/.settings-manifest`
 - **커밋하지 않기 권장:** `*.bak*`, `.manifest-backups/`, `.settings-backups/` — 설치기는 `.gitignore` 를 수정하지 않습니다(기존 원칙). 필요하면 직접 추가하세요.
@@ -291,6 +291,9 @@ installer가 만든 백업만 정리하기 위해 **소유 색인 2종**을 남�
   없는 파일(사용자 추가, `CLAUDE.md` 등 skip-if-exists 자산)은 그대로 둡니다.
 - **settings.json**: `.settings-manifest`가 기록한 hooks/permissions identity만 제거합니다.
   사용자 훅·사용자 `allow`·알 수 없는 최상위 키는 불변입니다.
+  설치기가 새로 만든 settings.json 이라도 파일 자체는 지우지 않습니다 — 소유 항목을 걷어 낸 뒤
+  `{"hooks": {}}` 같은 빈 껍데기가 남을 수 있으며, 동작에는 영향이 없습니다(필요하면 직접 삭제).
+  `system-setup` 위임분이 병합한 훅(PreCompact·UserPromptSubmit)은 위임 산출물이라 남습니다.
 - **디렉토리**: 제거 결과로 비게 된 것만 정리합니다.
 - **백업**: `*.bak`과 백업 소유 색인(`.manifest-backups` / `.settings-backups`)은
   남깁니다 — 복구 수단과 그 소유 근거를 제거가 지우면 안 됩니다.
