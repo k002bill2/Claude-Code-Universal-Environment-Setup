@@ -257,20 +257,22 @@ if ! $UNINSTALL; then
     enforce_profile_rules
 fi
 
-if [ "$PROFILE" = "full" ]; then
-    FULL=true
-fi
-
-if $FULL; then
-    WITH_ADVISOR=true
-    WITH_EXAMPLES=true
-    WITH_PM2=true
-    # --full 은 verify-hooks "조각 파일"만 설치한다.
-    # settings.json 병합은 --with-verify-hooks 를 명시했을 때만.
-fi
-if $FULL || $WITH_VERIFY_HOOKS; then
-    INSTALL_VERIFY_FRAGMENT=true
-fi
+# 프로필 → 파생 옵션. 최종 프로필 결정(TTY 경로 재결정 포함) 뒤에 다시 부른다.
+apply_profile_options() {
+    [ "$PROFILE" = "full" ] && FULL=true
+    if $FULL; then
+        WITH_ADVISOR=true
+        WITH_EXAMPLES=true
+        WITH_PM2=true
+        # --full 은 verify-hooks "조각 파일"만 설치한다.
+        # settings.json 병합은 --with-verify-hooks 를 명시했을 때만.
+    fi
+    if $FULL || $WITH_VERIFY_HOOKS; then
+        INSTALL_VERIFY_FRAGMENT=true
+    fi
+    return 0
+}
+apply_profile_options
 
 # ──────────────────────────────────────────────────────
 # Prerequisites: jq 또는 node 필수 (병합 엔진), advisor 는 python3 또는 jq
@@ -1919,11 +1921,12 @@ install_minimal_assets() {
 # <project>/.claude/.install-profile — 내용이 바뀔 때만 쓴다(멱등), 롤백 저널 추적
 write_profile_record() {
     local rec="${PROJECT_DIR}/.claude/.install-profile" want="profile=${PROFILE}"
-    [ "$(cat "$rec" 2>/dev/null)" = "$want" ] && return 0
-    if [ -L "$rec" ] || { [ -e "$rec" ] && [ ! -f "$rec" ]; }; then
-        log_warn "SKIPPED (링크/특수 파일 — 프로필 기록 안 함): .claude/.install-profile"
+    # 유형 검사가 먼저다 — FIFO 를 cat 하면 무기한 대기한다
+    if [ -L "$rec" ] || { [ -e "$rec" ] && [ ! -f "$rec" ]; } || ! managed_path_safe "$rec"; then
+        log_warn "SKIPPED (링크/특수 파일 경로 — 프로필 기록 안 함): .claude/.install-profile"
         return 0
     fi
+    [ "$(cat "$rec" 2>/dev/null)" = "$want" ] && return 0
     if $DRY_RUN; then
         log_info "[DRY RUN] Would record: .claude/.install-profile (${want})"
         return 0
@@ -1936,6 +1939,11 @@ write_profile_record() {
 remove_profile_record() {
     local rec="${PROJECT_DIR}/.claude/.install-profile"
     [ -f "$rec" ] && [ ! -L "$rec" ] || return 0
+    # 상위 경로(.claude)가 링크면 링크 너머를 지우게 된다 — 보존
+    if ! managed_path_safe "$rec"; then
+        log_warn "SKIPPED (심볼릭 링크 경로 — 삭제하지 않음): .claude/.install-profile"
+        return 0
+    fi
     if $DRY_RUN; then
         log_info "[DRY RUN] Would remove: .claude/.install-profile"
         return 0
@@ -2077,6 +2085,7 @@ if ! $UNINSTALL; then
     # TTY 프롬프트로 경로를 받은 경우 기록을 이제야 읽을 수 있다 — 다시 결정·검증
     resolve_profile
     enforce_profile_rules
+    apply_profile_options
     if [ "$PROFILE_SOURCE" = "default" ]; then
         echo "[WARN] 프로필 미지정 — core 는 ~/.claude 를 수정합니다. 프로젝트 초기에는 --profile minimal" >&2
     fi

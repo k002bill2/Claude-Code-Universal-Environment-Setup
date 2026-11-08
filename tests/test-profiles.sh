@@ -297,4 +297,27 @@ run_inst "$R" "$(H m)" --uninstall --project "$(P m)"; RC=$?
 [ "$RC" -eq 0 ] && pass "P10 uninstall exit 0" || fail "P10 uninstall exit ${RC}"
 [ ! -e "$(P m)/.claude/.install-profile" ] && pass "P10 .install-profile 제거" || fail "P10 .install-profile 잔존"
 
+# ── P11 (Codex P2): .install-profile 이 FIFO 여도 무기한 대기하지 않음 ──
+newenv ff
+mkdir -p "$(P ff)/.claude"; mkfifo "$(P ff)/.claude/.install-profile"
+( run_inst "$R" "$(H ff)" --profile minimal --project "$(P ff)" ) & FPID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+    kill -0 "$FPID" 2>/dev/null || break; sleep 1
+done
+if kill -0 "$FPID" 2>/dev/null; then
+    kill "$FPID" 2>/dev/null; pkill -f "$(P ff)" 2>/dev/null
+    fail "P11 FIFO 기록 파일에서 설치가 멈춤"
+else
+    wait "$FPID"; pass "P11 FIFO 기록 파일이어도 설치 완료(exit $?)"
+fi
+
+# ── P12 (Codex P2): .claude 가 링크로 바뀐 뒤 uninstall 이 링크 너머 기록을 지우지 않음 ──
+newenv lk
+run_inst "$R" "$(H lk)" --profile minimal --project "$(P lk)" || fail "P12 설치 exit≠0"
+mv "$(P lk)/.claude" "${SANDBOX_ROOT}/lk-outside"
+ln -s "${SANDBOX_ROOT}/lk-outside" "$(P lk)/.claude"
+run_inst "$R" "$(H lk)" --uninstall --project "$(P lk)"
+[ -f "${SANDBOX_ROOT}/lk-outside/.install-profile" ] && pass "P12 링크 너머 .install-profile 보존" \
+    || fail "P12 uninstall 이 링크 너머 .install-profile 삭제"
+
 finish
