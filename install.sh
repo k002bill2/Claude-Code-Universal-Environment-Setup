@@ -90,6 +90,9 @@ MINIMAL_TEMPLATE="${SCRIPT_DIR}/templates/CLAUDE.minimal.md"
 # shellcheck source=lib/manifest.sh
 . "${SCRIPT_DIR}/lib/manifest.sh"
 
+# --components 키 (정본 순서 — 기록·표시는 이 순서로 정규화)
+ALL_COMPONENT_KEYS="global guardrails permissions claude-md commands commands-auto agents skills skill-rules hooks verify-hooks pm2 system-setup extras memory-seed advisor examples"
+
 DRY_RUN=false
 GLOBAL_ONLY=false
 PROJECT_DIR=""
@@ -98,6 +101,14 @@ FULL_FLAG=false
 # 프로필: minimal | core | full. PROFILE_SOURCE = explicit | recorded | default
 PROFILE=""
 PROFILE_SOURCE=""
+# --components: COMP_KEYS 는 정규화·의존 확장된 키 목록(공백 구분, 정본 순서).
+# COMP_SOURCE = explicit | recorded | "" (없음)
+COMPONENTS_RAW=""
+COMPONENTS_SET=false
+COMP_KEYS=""
+COMP_SOURCE=""
+ASSUME_YES=false
+FORCE_GLOBAL=false
 TOUCHED_LIST=""
 WITH_ADVISOR=false
 WITH_EXAMPLES=false
@@ -144,6 +155,11 @@ usage() {
     echo "                       core:    previous default (global + project)"
     echo "                       full:    same as --full"
     echo "                       Unspecified: reuse <project>/.claude/.install-profile, else core"
+    echo "  --components LIST    Comma-separated keys (exact set; union with --profile/--full):"
+    echo "                       ${ALL_COMPONENT_KEYS// /,}"
+    echo "  --yes, --non-interactive"
+    echo "                       Never show the first-install menu (record or core)"
+    echo "  --force-global       Proceed even if the live advisor block drifted from the repo"
     echo "  --global-only        Install global settings (~/.claude/) only"
     echo "  --dry-run            Preview changes without modifying files"
     echo "  --full               Alias of --profile full: --with-advisor + --with-examples + --with-pm2"
@@ -179,6 +195,11 @@ while [[ $# -gt 0 ]]; do
                 *) log_error "--profile 은 minimal | core | full 중 하나입니다: '${PROFILE}'"; exit 1 ;;
             esac
             PROFILE_SOURCE="explicit"; ANY_FLAG=true; shift 2 ;;
+        --components)
+            if [ $# -lt 2 ]; then log_error "--components 에 키 목록이 필요합니다"; exit 1; fi
+            COMPONENTS_RAW="$2"; COMPONENTS_SET=true; ANY_FLAG=true; shift 2 ;;
+        --yes|--non-interactive) ASSUME_YES=true; ANY_FLAG=true; shift ;;
+        --force-global)      FORCE_GLOBAL=true; ANY_FLAG=true; shift ;;
         --full)              FULL_FLAG=true; ANY_FLAG=true; shift ;;
         --with-advisor)      WITH_ADVISOR=true; ANY_FLAG=true; shift ;;
         --with-examples)     WITH_EXAMPLES=true; ANY_FLAG=true; shift ;;
@@ -208,31 +229,109 @@ profile_record_path() {
     printf '%s/.claude/.install-profile' "${PROJECT_DIR/#\~/$HOME}"
 }
 
-read_profile_record() {
-    local rec v
+# $1 = 키(profile|components). 기록 파일이 일반 파일일 때만 읽는다(FIFO 대기 방지).
+read_record_field() {
+    local rec
     rec="$(profile_record_path)" || return 1
     [ -f "$rec" ] && [ ! -L "$rec" ] || return 1
-    v="$(sed -n 's/^profile=//p' "$rec" 2>/dev/null | head -1)"
+    sed -n "s/^$1=//p" "$rec" 2>/dev/null | head -1
+}
+
+read_profile_record() {
+    local v
+    v="$(read_record_field profile)" || return 1
     case "$v" in
         minimal|core|full) printf '%s' "$v" ;;
         *) return 1 ;;
     esac
 }
 
+comp_known() {
+    case " $ALL_COMPONENT_KEYS " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+
+# 쉼표 목록 → 검증 → 자동 의존 확장 → 정본 순서 COMP_KEYS. 실패 시 exit 1(쓰기 전).
+# $1 = 원문, $2 = 출처 라벨(오류 메시지용)
+parse_components() {
+    local raw="$1" label="$2" k bad="" picked=" " out="" old_ifs="$IFS"
+    raw="$(printf '%s' "$raw" | tr -d ' \t')"
+    if [ -z "$raw" ] || [ -z "$(printf '%s' "$raw" | tr -d ',')" ]; then
+        log_error "${label}: 빈 키 목록입니다."
+        log_error "사용 가능한 키: ${ALL_COMPONENT_KEYS// /, }"
+        exit 1
+    fi
+    IFS=','
+    for k in $raw; do
+        [ -n "$k" ] || continue
+        if comp_known "$k"; then picked="${picked}${k} "; else bad="${bad} ${k}"; fi
+    done
+    IFS="$old_ifs"
+    if [ -n "$bad" ]; then
+        log_error "${label}: 알 수 없는 키:${bad}"
+        log_error "사용 가능한 키: ${ALL_COMPONENT_KEYS// /, }"
+        log_error "(cross-review 는 키가 아닙니다 — --with-cross-review 를 쓰세요)"
+        exit 1
+    fi
+    # 자동 의존: verify-hooks/pm2 는 배선할 훅 스크립트가 있어야 한다
+    for k in verify-hooks pm2; do
+        case "$picked" in
+            *" $k "*)
+                case "$picked" in
+                    *" hooks "*) ;;
+                    *) picked="${picked}hooks "
+                       log_info "components: ${k} 는 hooks 에 의존 — hooks 자동 추가" ;;
+                esac ;;
+        esac
+    done
+    for k in $ALL_COMPONENT_KEYS; do
+        case "$picked" in *" $k "*) out="${out:+$out }$k" ;; esac
+    done
+    COMP_KEYS="$out"
+}
+
 resolve_profile() {
-    [ "$PROFILE_SOURCE" = "explicit" ] && return 0
-    local rec
+    # 명시(프로필·components·메뉴 중 하나라도)는 기록 전체를 대체한다(R1 규칙)
+    if [ "$PROFILE_SOURCE" = "explicit" ] || [ "$PROFILE_SOURCE" = "menu" ] || $COMPONENTS_SET; then
+        if $COMPONENTS_SET && [ -z "$COMP_SOURCE" ]; then
+            parse_components "$COMPONENTS_RAW" "--components"
+            COMP_SOURCE="explicit"
+        fi
+        if [ -z "$PROFILE" ]; then PROFILE_SOURCE="${COMP_SOURCE:-explicit}"; fi
+        return 0
+    fi
+    local rec rc
+    PROFILE=""; PROFILE_SOURCE=""; COMP_KEYS=""; COMP_SOURCE=""
     if rec="$(read_profile_record)"; then
         PROFILE="$rec"; PROFILE_SOURCE="recorded"
-    else
+    fi
+    rc="$(read_record_field components 2>/dev/null || true)"
+    if [ -n "$rc" ]; then
+        parse_components "$rc" ".claude/.install-profile 의 components"
+        COMP_SOURCE="recorded"
+        [ -n "$PROFILE" ] || PROFILE_SOURCE="recorded"
+    fi
+    if [ -z "$PROFILE" ] && [ -z "$COMP_KEYS" ]; then
         PROFILE="core"; PROFILE_SOURCE="default"
     fi
 }
 
+comp_on() {
+    case " $COMP_KEYS " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+
 # 배타 규칙과 minimal fail-closed. 위반 시 아무것도 쓰기 전에 exit 1.
 enforce_profile_rules() {
-    [ "$PROFILE" = "minimal" ] || return 0
     local bad=""
+    if comp_on guardrails && ! command -v python3 >/dev/null 2>&1; then
+        log_error "components: guardrails 는 python3 훅이라 python3 없이 설치하지 않습니다 (fail-closed)."
+        exit 1
+    fi
+    [ "$PROFILE" = "minimal" ] || return 0
+    comp_on global && bad="${bad} global"
+    comp_on memory-seed && bad="${bad} memory-seed"
+    comp_on advisor && bad="${bad} advisor"
     $WITH_ADVISOR && bad="${bad} --with-advisor"
     $WITH_CROSS_REVIEW && bad="${bad} --with-cross-review"
     $GLOBAL_ONLY && bad="${bad} --global-only"
@@ -260,6 +359,10 @@ fi
 # 프로필 → 파생 옵션. 최종 프로필 결정(TTY 경로 재결정 포함) 뒤에 다시 부른다.
 apply_profile_options() {
     [ "$PROFILE" = "full" ] && FULL=true
+    comp_on advisor && WITH_ADVISOR=true
+    comp_on examples && WITH_EXAMPLES=true
+    if comp_on pm2; then WITH_PM2=true; PM2_HOOKS_MERGE=true; fi
+    comp_on verify-hooks && WITH_VERIFY_HOOKS=true
     if $FULL; then
         WITH_ADVISOR=true
         WITH_EXAMPLES=true
@@ -1636,27 +1739,50 @@ install_global() {
 # ──────────────────────────────────────────────────────
 # Step 2a: Project assets (skills/agents/commands + 사용자 소유 파일)
 # ──────────────────────────────────────────────────────
+# 키 단위 게이트(step_on). core/full 은 전부, minimal 은 verify-app + 골격 CLAUDE.md,
+# --components 는 고른 키만.
 install_project_assets() {
     local claude_dir="${PROJECT_DIR}/.claude"
     local f d name
     log_info "프로젝트 설치: ${claude_dir}/"
-    for d in "${SCRIPT_DIR}/project/skills/"*/; do
-        [ -d "$d" ] || continue
-        name="$(basename "$d")"
-        install_managed_dir "$d" "${claude_dir}/skills/${name}" ".claude/skills/${name}/"
-    done
-    for f in "${SCRIPT_DIR}/project/agents/"*.md; do
-        [ -f "$f" ] || continue
-        name="$(basename "$f")"
-        install_managed_file "$f" "${claude_dir}/agents/${name}" ".claude/agents/${name}"
-    done
+    if step_on skills; then
+        for d in "${SCRIPT_DIR}/project/skills/"*/; do
+            [ -d "$d" ] || continue
+            name="$(basename "$d")"
+            install_managed_dir "$d" "${claude_dir}/skills/${name}" ".claude/skills/${name}/"
+        done
+    fi
+    if step_on agents; then
+        for f in "${SCRIPT_DIR}/project/agents/"*.md; do
+            [ -f "$f" ] || continue
+            name="$(basename "$f")"
+            install_managed_file "$f" "${claude_dir}/agents/${name}" ".claude/agents/${name}"
+        done
+    fi
     for f in "${SCRIPT_DIR}/project/commands/"*.md; do
         [ -f "$f" ] || continue
         name="$(basename "$f")"
+        case "$name" in
+            auto.md)       step_on commands_auto || continue ;;
+            verify-app.md) step_on commands || [ "$PROFILE" = "minimal" ] || continue ;;
+            *)             step_on commands || continue ;;
+        esac
         install_managed_file "$f" "${claude_dir}/commands/${name}" ".claude/commands/${name}"
     done
-    install_user_file "${SCRIPT_DIR}/CLAUDE.md.template" "${PROJECT_DIR}/CLAUDE.md" "CLAUDE.md (템플릿)"
-    install_user_file "${SCRIPT_DIR}/project/skill-rules.json" "${claude_dir}/skill-rules.json" ".claude/skill-rules.json"
+    if step_on claude_md; then
+        if profile_base_on; then
+            install_user_file "${SCRIPT_DIR}/CLAUDE.md.template" "${PROJECT_DIR}/CLAUDE.md" "CLAUDE.md (템플릿)"
+        else
+            install_minimal_claude_md
+        fi
+    fi
+    if step_on skill_rules; then
+        install_user_file "${SCRIPT_DIR}/project/skill-rules.json" "${claude_dir}/skill-rules.json" ".claude/skill-rules.json"
+        if ! step_on system_setup; then
+            log_warn "skill-rules.json 은 system-setup(skill-activator 훅)이 읽습니다 — system-setup 없이 설치하면 동작하지 않습니다."
+        fi
+    fi
+    return 0
 }
 
 # ──────────────────────────────────────────────────────
@@ -1708,7 +1834,9 @@ install_project_hooks() {
 install_project_settings() {
     local claude_dir="${PROJECT_DIR}/.claude"
     local settings="${claude_dir}/settings.json"
-    if command -v python3 >/dev/null 2>&1; then
+    if ! step_on guardrails; then
+        :
+    elif command -v python3 >/dev/null 2>&1; then
         merge_fragment_into "$settings" "${FRAGMENTS_DIR}/guardrails.json" \
             ".claude/settings.json <- guardrails.json"
     else
@@ -1736,6 +1864,20 @@ install_project_settings() {
             ".claude/settings.json <- pm2-hooks.json"
     fi
     sweep_removed_fragments "$settings" "$FRAGMENTS_DIR" ".claude/settings.json"
+    # settings 선생성 불변식: system-setup 위임 전에 settings.json 이 반드시 있어야
+    # 위임 설치기가 "신규 템플릿(model 키)" 경로를 타지 않는다. guardrails·permissions
+    # 를 고르지 않은 --components 조합에서는 위 병합이 파일을 만들지 않으므로 빈 {} 로 만든다.
+    if step_on system_setup && [ ! -e "$settings" ] && [ ! -L "$settings" ]; then
+        if $DRY_RUN; then
+            log_info "[DRY RUN] Would pre-create (선생성): .claude/settings.json ({})"
+        elif managed_path_safe "$settings"; then
+            mkdir -p "$claude_dir"
+            rb_track "$settings"
+            printf '{}\n' > "$settings"
+            log_info "settings.json 선생성({}) — system-setup 위임 전 불변식"
+        fi
+    fi
+    return 0
 }
 
 # ──────────────────────────────────────────────────────
@@ -1752,6 +1894,9 @@ install_project_extras() {
         "docs/Parallel_Agents_Safety_Protocol_v3_1_0.md"
     ensure_gitkeep "${PROJECT_DIR}/dev/active/.gitkeep"
     ensure_gitkeep "${PROJECT_DIR}/dev/completed/.gitkeep"
+}
+
+install_memory_seed() {
     # 메모리 시드: slug = 프로젝트 절대경로의 '/' 와 '.' 을 '-' 로 치환
     local slug
     slug="$(printf '%s' "$PROJECT_DIR" | tr '/.' '--')"
@@ -1843,15 +1988,25 @@ install_pm2_templates() {
 # 프로필 게이트 — Main Flow 의 단계 호출부에서 `step_on <name> && install_xxx`.
 # 2차 레인(--components)은 여기만 확장하면 된다.
 # ──────────────────────────────────────────────────────
+profile_base_on() { [ "$PROFILE" = "core" ] || [ "$PROFILE" = "full" ]; }
+
 step_on() {
     case "$1" in
-        global|project_assets|project_extras|system_setup|cli_allow)
-            [ "$PROFILE" != "minimal" ] ;;
-        minimal_assets)
-            [ "$PROFILE" = "minimal" ] ;;
+        global)         profile_base_on || comp_on global ;;
+        cli_allow)      profile_base_on || comp_on permissions ;;
+        guardrails)     profile_base_on || [ "$PROFILE" = "minimal" ] || comp_on guardrails ;;
+        claude_md)      profile_base_on || [ "$PROFILE" = "minimal" ] || comp_on claude-md ;;
+        commands)       profile_base_on || comp_on commands ;;
+        commands_auto)  profile_base_on || comp_on commands-auto ;;
+        agents)         profile_base_on || comp_on agents ;;
+        skills)         profile_base_on || comp_on skills ;;
+        skill_rules)    profile_base_on || comp_on skill-rules ;;
+        extras)         profile_base_on || comp_on extras ;;
+        memory_seed)    profile_base_on || comp_on memory-seed ;;
+        system_setup)   profile_base_on || comp_on system-setup ;;
         # 배선 옵션이 켜지면 훅 파일도 깐다 — 없는 스크립트를 배선하지 않도록
         project_hooks)
-            [ "$PROFILE" != "minimal" ] || $WITH_PM2 || $WITH_VERIFY_HOOKS ;;
+            profile_base_on || comp_on hooks || $WITH_PM2 || $WITH_VERIFY_HOOKS ;;
         advisor)  $WITH_ADVISOR ;;
         examples) $WITH_EXAMPLES ;;
         pm2)      $WITH_PM2 ;;
@@ -1860,7 +2015,7 @@ step_on() {
 }
 
 profile_label() {
-    local l="$PROFILE"
+    local l="${PROFILE:-(none)}"
     if [ "$PROFILE" = "minimal" ]; then
         $WITH_EXAMPLES && l="${l}+examples"
         $WITH_PM2 && l="${l}+pm2"
@@ -1900,12 +2055,8 @@ render_minimal_claude_md() {
     done < "$MINIMAL_TEMPLATE"
 }
 
-# minimal 전용 자산: verify-app 커맨드 1개 + CLAUDE.md 골격(skip-if-exists)
-install_minimal_assets() {
-    local claude_dir="${PROJECT_DIR}/.claude"
-    log_info "프로젝트 설치(minimal): ${claude_dir}/"
-    install_managed_file "${SCRIPT_DIR}/project/commands/verify-app.md" \
-        "${claude_dir}/commands/verify-app.md" ".claude/commands/verify-app.md"
+# CLAUDE.md 골격(skip-if-exists) — minimal 및 core/full 이 아닌 claude-md 키
+install_minimal_claude_md() {
     if [ ! -f "$MINIMAL_TEMPLATE" ]; then
         log_error "minimal 템플릿 없음: ${MINIMAL_TEMPLATE}"
         exit 1
@@ -1920,7 +2071,13 @@ install_minimal_assets() {
 
 # <project>/.claude/.install-profile — 내용이 바뀔 때만 쓴다(멱등), 롤백 저널 추적
 write_profile_record() {
-    local rec="${PROJECT_DIR}/.claude/.install-profile" want="profile=${PROFILE}"
+    local rec="${PROJECT_DIR}/.claude/.install-profile" want=""
+    [ -n "$PROFILE" ] && [ "$PROFILE_SOURCE" != "default" ] && want="profile=${PROFILE}"
+    if [ -n "$COMP_KEYS" ]; then
+        want="${want:+${want}
+}components=${COMP_KEYS// /,}"
+    fi
+    [ -n "$want" ] || return 0
     # 유형 검사가 먼저다 — FIFO 를 cat 하면 무기한 대기한다
     if [ -L "$rec" ] || { [ -e "$rec" ] && [ ! -f "$rec" ]; } || ! managed_path_safe "$rec"; then
         log_warn "SKIPPED (링크/특수 파일 경로 — 프로필 기록 안 함): .claude/.install-profile"
@@ -1991,7 +2148,7 @@ print_checklist() {
     echo "       /plugin install codex@codex"
     echo "     이후 터미널에서: codex login"
     fi
-    if step_on project_extras; then
+    if step_on extras; then
     echo "  2. MCP: .mcp.json.example 을 .mcp.json 으로 리네임하고 시크릿(토큰/키)을 주입"
     fi
     # .mcp.json.example 은 skip-if-exists 라 기존 설치에는 갱신본이 닿지 않는다.
@@ -2040,6 +2197,14 @@ print_summary() {
     echo "  Installation Summary"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "  profile: $(profile_label) (${PROFILE_SOURCE})"
+    if [ -n "$COMP_KEYS" ]; then
+        echo "  components: ${COMP_KEYS// /,} (${COMP_SOURCE})"
+    fi
+    if step_on global || step_on memory_seed || $WITH_ADVISOR || $WITH_CROSS_REVIEW; then
+        echo "  ~/.claude 쓰기: 예"
+    else
+        echo "  ~/.claude 쓰기: 아니오"
+    fi
     echo "  INSTALLED: ${INSTALLED_COUNT} | UNCHANGED: ${UNCHANGED_COUNT} | BACKED_UP: ${BACKED_UP_COUNT} | SKIPPED: ${SKIPPED_COUNT}"
     echo "  (위임 설치기 system-setup / advisor-worker 의 상세는 각자의 요약 출력 참조)"
     echo ""
@@ -2100,11 +2265,11 @@ fi
 step_on global && install_global
 
 if ! $GLOBAL_ONLY && [ -n "$PROJECT_DIR" ]; then
-    step_on minimal_assets && install_minimal_assets
-    step_on project_assets && install_project_assets
+    install_project_assets
     step_on project_hooks && install_project_hooks
     install_project_settings
-    step_on project_extras && install_project_extras
+    step_on extras && install_project_extras
+    step_on memory_seed && install_memory_seed
     echo ""
     step_on system_setup && delegate_system_setup
 fi
@@ -2136,7 +2301,7 @@ fi
 if ! $GLOBAL_ONLY && [ -n "$PROJECT_DIR" ]; then
     sweep_removed_assets "$PROJECT_DIR" "project" "$PROJECT_DIR"
     # 명시·기록된 프로필만 기록한다. 미명시 core(default)는 기존 산출물 계약 그대로.
-    [ "$PROFILE_SOURCE" != "default" ] && write_profile_record
+    write_profile_record
 fi
 
 echo ""
