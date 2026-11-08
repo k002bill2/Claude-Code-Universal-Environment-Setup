@@ -240,6 +240,13 @@ run_inst "$R" "$(H f2)" --profile full --project "$(P f2)" || fail "P8 --profile
     && pass "P8 --full 과 --profile full 글로벌 산출물 동일" || fail "P8 글로벌 산출물 상이"
 BASE="${SANDBOX_ROOT}/base-repo"; mkdir -p "$BASE"
 if git -C "$R" archive c39be55 2>/dev/null | tar -x -C "$BASE" 2>/dev/null && [ -f "$BASE/install.sh" ]; then
+    # 비교 대상은 "설치기 로직" 이다. global/ 페이로드(rules·skills 내용)는 sync-from-live 로
+    # 정당하게 갱신되므로 현재 것을 덮어써 내용 변경이 이 회귀 검사를 깨지 않게 한다.
+    rm -rf "$BASE/global" && cp -R "$R/global" "$BASE/global"
+    # docs/ 도 현재 작업트리 사본으로 맞춘다. git archive 는 한글 파일명을 NFC 로 풀지만
+    # 오래된 macOS 체크아웃은 같은 이름이 NFD 로 남아 있어, 내용이 같아도 경로 문자열이
+    # 달라 스냅샷 비교가 실패한다(설치기 로직과 무관한 체크아웃 환경 차이).
+    rm -rf "$BASE/docs" && cp -R "$R/docs" "$BASE/docs"
     newenv f0
     run_inst "$BASE" "$(H f0)" --full --project "$(P f0)" || fail "P8 변경 전 --full exit≠0"
     # .settings-manifest 는 push identity 기록 1건 차이를 담는다 — 아래에서 따로 검증
