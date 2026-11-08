@@ -1,6 +1,6 @@
 # Claude Code Universal Environment Setup
 
-**`./install.sh --full --project <dir>` 한 번으로 — `docs/` 폴더의 모든 기능까지 — Claude Code 환경 전체를 설치합니다.**
+**`./install.sh --profile minimal --project <dir>` 로 프로젝트만 안전하게 시작하고, 필요할 때 `--profile full` 한 번으로 — `docs/` 폴더의 모든 기능까지 — Claude Code 환경 전체를 설치합니다.**
 
 8개 프로젝트 운영 경험에서 추출한 범용(Universal) 설정 + `docs/` 하위 두 번들(system-setup, codex-advisor-worker)을 단일 오케스트레이터로 통합했습니다.
 
@@ -10,8 +10,9 @@
 git clone https://github.com/k002bill2/Claude-Code-Universal-Environment-Setup.git
 cd Claude-Code-Universal-Environment-Setup
 
-./install.sh --full --project /path/to/project   # docs 폴더 기능 포함 전체 설치
-./install.sh --project /path/to/project          # 코어만 (글로벌 + 프로젝트 + system-setup 위임)
+./install.sh --profile minimal --project /path/to/project  # 프로젝트 초기 권장 — ~/.claude 쓰기 0건
+./install.sh --profile core --project /path/to/project     # 글로벌 + 프로젝트 + system-setup 위임 (미지정 기본값)
+./install.sh --profile full --project /path/to/project     # = --full, docs 폴더 기능 포함 전체 설치
 ./install.sh --global-only                       # ~/.claude/ 글로벌 설정만
 ./install.sh --dry-run --full --project /path    # 실제 쓰기 없이 계획만 출력
 ```
@@ -20,14 +21,32 @@ cd Claude-Code-Universal-Environment-Setup
 
 대화형 프롬프트는 없습니다. 유일한 예외: 플래그 없이 실행했고 stdin이 TTY일 때만 프로젝트 경로를 질문합니다(비TTY면 프로젝트 단계를 스킵하고 안내만 출력).
 
+## Profiles (`--profile minimal|core|full`)
+
+| 프로필 | 설치물 | `~/.claude` 쓰기 |
+|--------|--------|------------------|
+| `minimal` | guardrails 훅 병합(`.claude/settings.json`), `.claude/commands/verify-app.md`, minimal `CLAUDE.md` 골격(이미 있으면 건드리지 않음), `.claude/.install-profile`. **permissions allow 는 추가하지 않습니다** | **없음** (메모리 시드 포함 0건) |
+| `core` | 기존 `--project` 기본 동작: 글로벌 rules·skills·docs·settings + 프로젝트 스킬·에이전트·커맨드·훅·settings + system-setup 위임 | 있음 |
+| `full` | `core` + `--with-advisor` `--with-examples` `--with-pm2` + verify-hooks 조각 파일 (= `--full`) | 있음 |
+
+- **기록·재사용:** 설치한 프로필은 `<project>/.claude/.install-profile` (`profile=<name>`)에 남습니다. 다음 실행에서 프로필을 지정하지 않으면 기록을 재사용합니다(비TTY/CI 포함, 요약에 `recorded`). 기록도 없으면 기존 계약대로 `core` 이며 stderr 에 경고 1줄을 냅니다. `--uninstall` 은 기록을 지웁니다.
+- **배타 규칙(exit 1, 무변경):** 실효 프로필이 `minimal` 인데 `--with-advisor` / `--with-cross-review` / `--global-only` 를 지정한 경우, `--full` 과 `--profile minimal|core` 를 함께 지정한 경우. `--with-examples` / `--with-pm2` / `--with-verify-hooks` 는 프로젝트 전용이라 minimal 위에 허용됩니다(요약 `minimal+<옵션>`; pm2·verify-hooks 는 훅 파일 설치를 함께 켭니다).
+- **minimal 은 python3 필수(fail-closed):** guardrails 훅이 유일한 보호 장치라 python3 가 없으면 어떤 쓰기도 하기 전에 exit 1 합니다. core/full 은 기존처럼 경고 후 병합만 건너뜁니다.
+- **프로필 축소는 무삭제:** full→minimal 재실행은 이전에 깐 installer 소유 자산을 지우지도 갱신하지도 않습니다. 요약에 "이전 설치에서 남은 installer 소유 자산 N건" 을 표시합니다. 지우려면 `--uninstall`.
+- **이미 하네스가 깔린 머신에서는 core/full 을 프로젝트마다 돌리지 마세요.** 글로벌 단계는 무동작이거나, 리포가 라이브보다 낡았으면 구버전으로 롤백합니다(아래 *Sync From Live*). 새 프로젝트는 `minimal` 로 충분합니다.
+- **`git push` 사전 허용 제거(2026-11):** 원격 쓰기는 사람 승인 원칙이라 `cli-orchestration.json` allow 에서 뺐습니다. 재설치 시 설치기가 넣었던 항목만 제거되고, 사용자가 직접 넣은 같은 문자열은 보존됩니다.
+- guardrails 는 일부 위험 패턴을 막는 **보조 가드**이며 사람 승인·샌드박스를 대체하지 않습니다.
+- `--components` 개별 선택과 TTY 메뉴는 2차 예정입니다.
+
 ## Flags
 
 | 플래그 | 의미 |
 |--------|------|
+| `--profile NAME` | `minimal` / `core` / `full` (위 *Profiles*). 미지정 시 기록 재사용, 없으면 `core` |
 | `--project PATH` | 프로젝트 자산(.claude/ 스킬·에이전트·커맨드·settings 병합 등)을 PATH에 설치 |
 | `--global-only` | 글로벌 단계(~/.claude/ rules·skills)만 실행 |
 | `--dry-run` | 모든 쓰기·하위 설치기 위임을 `[DRY RUN] Would ...`로만 출력, 실제 실행 없음 |
-| `--full` | `--with-advisor` + `--with-examples` + `--with-pm2` + verify-hooks 조각 파일 설치 (settings 병합은 `--with-verify-hooks` / `--with-pm2` 를 **명시**했을 때만) |
+| `--full` | `--profile full` 별칭. `--with-advisor` + `--with-examples` + `--with-pm2` + verify-hooks 조각 파일 설치 (settings 병합은 `--with-verify-hooks` / `--with-pm2` 를 **명시**했을 때만) |
 | `--with-advisor` | codex-advisor-worker-bundle 설치기 위임 (조언자–작업자–검증 체계) |
 | `--with-examples` | `examples/` 스킬·에이전트를 프로젝트 `.claude/`에 추가 설치 |
 | `--with-pm2` | PM2 템플릿을 `<project>/docs/templates/pm2/`에 복사 + pm2-hooks 조각을 `settings.json`에 병합 |
