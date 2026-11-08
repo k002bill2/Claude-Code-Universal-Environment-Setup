@@ -24,7 +24,7 @@ echo "=== F2: cli-orchestration allow list — 인자 허용 접두 문법 + 광
 CLI_ORK="${REPO_DIR}/project/settings-fragments/cli-orchestration.json"
 # 인자를 받는 명령은 정확 매칭이면 무용지물이다 ("git add" 는 인자 없는 호출만
 # 허용하는데 그런 호출은 아무 일도 하지 않는다). 접두 문법 `cmd:*` 을 써야 한다.
-for cmd in "Bash(git add:*)" "Bash(git commit:*)" "Bash(git push:*)" \
+for cmd in "Bash(git add:*)" "Bash(git commit:*)" \
            "Bash(git pull:*)" "Bash(git branch:*)" "Bash(git checkout:*)" \
            "Bash(npm run build:*)" "Bash(npm run test:*)"; do
     if jq -r '.permissions.allow[]' "$CLI_ORK" 2>/dev/null | grep -qxF "$cmd"; then
@@ -33,6 +33,12 @@ for cmd in "Bash(git add:*)" "Bash(git commit:*)" "Bash(git push:*)" \
         fail "F2 인자 허용 접두 항목 없음: $cmd"
     fi
 done
+# 원격 쓰기(push)는 사람 승인 원칙 — allow 로 사전 허용하지 않는다 (2026-11-08 결정)
+if jq -r '.permissions.allow[]' "$CLI_ORK" 2>/dev/null | grep -q 'git push'; then
+    fail "F2 git push 가 allow 에 남아 있음 (원격 쓰기는 사람 승인)"
+else
+    pass "F2 git push 사전 허용 없음"
+fi
 # 인자 없이 쓰는 명령은 정확 매칭 유지 (최소권한)
 for cmd in "Bash(git status)" "Bash(npm install)"; do
     if jq -r '.permissions.allow[]' "$CLI_ORK" 2>/dev/null | grep -qxF "$cmd"; then
