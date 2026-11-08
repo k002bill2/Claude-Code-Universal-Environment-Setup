@@ -7,8 +7,8 @@
 - [x] C3: 글로벌 드리프트 사전 점검 (rules/skills WARN, advisor CLAUDE.md 블록 exit 1, --force-global)
 - [x] C3: README — components 표, full ≠ 모든 키, 메뉴, Orca / git worktree 운영 절
 - [x] C3: Codex 리뷰 1회 + 반영
-- [ ] 전체 tests/*.sh 실행 (마지막 커밋 후), bash -n, shellcheck 신규 0
-- [ ] REPORT.md
+- [x] 전체 tests/*.sh 실행 (마지막 커밋 후), bash -n, shellcheck 신규 0
+- [x] REPORT.md
 
 ## 기록
 - C1 cb3d062: test-components RED FAIL 43 → GREEN 72/0. 회귀: profiles 83/0, install 92/0, lifecycle 149/0.
