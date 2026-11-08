@@ -351,8 +351,106 @@ enforce_profile_rules() {
     fi
 }
 
+# ──────────────────────────────────────────────────────
+# 첫 설치 TTY 메뉴 — 조건이 전부 참일 때만. 비TTY·CI·--yes·--dry-run 에서는 절대 묻지 않는다.
+# 타임아웃/EOF/2회 잘못된 입력은 exit 1 (조용히 core 로 가지 않는다).
+# CCUES_FORCE_TTY=1 / CCUES_MENU_TIMEOUT 은 테스트 훅(tests/README.md).
+# ──────────────────────────────────────────────────────
+is_tty() { [ -t 0 ] || [ "${CCUES_FORCE_TTY:-}" = "1" ]; }
+
+menu_eligible() {
+    local rec
+    [ -n "$PROJECT_DIR" ] || return 1
+    [ "$PROFILE_SOURCE" = "default" ] || return 1
+    $COMPONENTS_SET && return 1
+    $FULL_FLAG && return 1
+    rec="$(profile_record_path)" || return 1
+    { [ -e "$rec" ] || [ -L "$rec" ]; } && return 1
+    [ -z "${CI:-}" ] || return 1
+    $ASSUME_YES && return 1
+    $DRY_RUN && return 1
+    $UNINSTALL && return 1
+    is_tty
+}
+
+# $1 = 프롬프트. 결과는 MENU_ANSWER. 타임아웃/EOF → exit 1.
+menu_read() {
+    printf '%s' "$1" >&2
+    MENU_ANSWER=""
+    if ! IFS= read -r -t "${CCUES_MENU_TIMEOUT:-60}" MENU_ANSWER; then
+        echo "" >&2
+        log_error "입력 없음(타임아웃/EOF) — 설치하지 않습니다. 비대화식은 --profile/--components/--yes 를 쓰세요." >&2
+        exit 1
+    fi
+    MENU_ANSWER="$(printf '%s' "$MENU_ANSWER" | tr -d ' \t\r')"
+}
+
+# 번호(1..N) 또는 키 이름이 섞인 쉼표 목록 → 키 이름 쉼표 목록
+menu_keys_from_input() {
+    local tok out="" i k old_ifs="$IFS"
+    IFS=','
+    for tok in $1; do
+        IFS="$old_ifs"
+        case "$tok" in
+            ''|*[!0-9]*) out="${out:+$out,}$tok" ;;
+            *)  i=0
+                for k in $ALL_COMPONENT_KEYS; do
+                    i=$((i + 1))
+                    [ "$i" -eq "$tok" ] && break
+                done
+                [ "$i" -eq "$tok" ] && out="${out:+$out,}$k" || out="${out:+$out,}#${tok}" ;;
+        esac
+        IFS=','
+    done
+    IFS="$old_ifs"
+    printf '%s' "$out"
+}
+
+run_first_install_menu() {
+    menu_eligible || return 0
+    local try i k
+    {
+        echo ""
+        echo "첫 설치 — 설치 구성을 고르세요 (.claude/.install-profile 에 기록됩니다):"
+        echo "  1) minimal (기본 — 프로젝트 초기 권장)"
+        echo "  2) full"
+        echo "  3) 직접 선택"
+        echo "  4) core"
+    } >&2
+    for try in 1 2; do
+        menu_read "선택 [1]: "
+        case "$MENU_ANSWER" in
+            ''|1) PROFILE="minimal"; PROFILE_SOURCE="menu"; return 0 ;;
+            2)    PROFILE="full"; PROFILE_SOURCE="menu"; return 0 ;;
+            4)    PROFILE="core"; PROFILE_SOURCE="menu"; return 0 ;;
+            3)
+                {
+                    echo "키 번호 또는 이름을 쉼표로 입력하세요:"
+                    i=0
+                    for k in $ALL_COMPONENT_KEYS; do
+                        i=$((i + 1)); printf '  %2d) %s\n' "$i" "$k"
+                    done
+                } >&2
+                menu_read "키: "
+                PROFILE=""; PROFILE_SOURCE="menu"
+                COMPONENTS_RAW="$(menu_keys_from_input "$MENU_ANSWER")"
+                COMPONENTS_SET=true
+                parse_components "$COMPONENTS_RAW" "메뉴 입력"
+                COMP_SOURCE="menu"
+                return 0 ;;
+            *)
+                if [ "$try" -eq 1 ]; then
+                    echo "알 수 없는 선택: '${MENU_ANSWER}' — 1~4 중 하나를 입력하세요." >&2
+                fi ;;
+        esac
+    done
+    log_error "알 수 없는 선택이 반복됐습니다 — 설치하지 않습니다."
+    exit 1
+}
+
 if ! $UNINSTALL; then
     resolve_profile
+    run_first_install_menu
     enforce_profile_rules
 fi
 
@@ -1552,7 +1650,7 @@ resolve_project_dir() {
         return 0
     fi
     if [ -z "$PROJECT_DIR" ]; then
-        if ! $ANY_FLAG && [ -t 0 ]; then
+        if ! $ANY_FLAG && is_tty; then
             printf "프로젝트 설치 대상 경로 (비우면 글로벌만 설치): "
             read -r PROJECT_DIR
             PROJECT_DIR="${PROJECT_DIR/#\~/$HOME}"
