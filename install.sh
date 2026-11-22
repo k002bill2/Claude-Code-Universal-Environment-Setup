@@ -511,6 +511,40 @@ check_prereqs() {
             exit 1
         fi
     fi
+    check_claude_version
+}
+
+# 최소 Claude Code 버전 — 에이전트 모델 별칭(opus/sonnet/haiku) 지원 하한.
+# 근거: https://code.claude.com/docs/en/model-config (2026-11-19 갱신)
+#   Opus 5.5 >= v2.1.280, Sonnet 5.5 >= v2.1.284, Haiku 5.5 >= v2.1.293
+# 미만이면 경고만 한다(설치 계속, exit 코드 불변). --dry-run 에서도 동작(읽기 전용).
+MIN_CLAUDE_VERSION="2.1.293"
+
+check_claude_version() {
+    local raw ver cur min i c m
+    if ! command -v claude >/dev/null 2>&1; then
+        log_info "claude CLI 미발견 — 버전 점검 생략"
+        return 0
+    fi
+    raw="$(claude --version 2>/dev/null || true)"
+    ver="$(printf '%s\n' "$raw" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+    if [ -z "$ver" ]; then
+        log_warn "claude --version 출력에서 버전을 읽지 못했습니다 — 버전 점검 생략"
+        return 0
+    fi
+    # 숫자 필드별 비교 (문자열 비교 금지: 2.1.300 > 2.1.293, 2.1.29 < 2.1.293)
+    cur="$ver"; min="$MIN_CLAUDE_VERSION"
+    for i in 1 2 3; do
+        c="$(printf '%s' "$cur" | cut -d. -f"$i")"
+        m="$(printf '%s' "$min" | cut -d. -f"$i")"
+        if [ "$((10#$c))" -gt "$((10#$m))" ]; then return 0; fi
+        if [ "$((10#$c))" -lt "$((10#$m))" ]; then
+            log_warn "Claude Code ${ver} < 최소 ${MIN_CLAUDE_VERSION} — haiku 등 에이전트 모델 호출이 실패할 수 있습니다."
+            log_warn "  'claude update' 로 업데이트하세요 (설치는 계속 진행합니다)."
+            return 0
+        fi
+    done
+    return 0
 }
 
 # ──────────────────────────────────────────────────────

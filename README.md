@@ -18,6 +18,7 @@ cd Claude-Code-Universal-Environment-Setup
 ```
 
 사전 요구: `jq` 또는 `node` 필수(settings.json 병합 엔진). `--with-advisor` 사용 시 `python3` 또는 `jq`.
+권장 Claude Code `>= 2.1.293`(Haiku 5.5 모델 별칭 지원 하한 — Opus 5.5 ≥ 2.1.280, Sonnet 5.5 ≥ 2.1.284). 미만이면 설치 시작 시 경고만 출력하고 계속합니다(`claude update`로 갱신).
 
 대화형 프롬프트는 없습니다. 유일한 예외: 플래그 없이 실행했고 stdin이 TTY일 때만 프로젝트 경로를 질문합니다(비TTY면 프로젝트 단계를 스킵하고 안내만 출력).
 
