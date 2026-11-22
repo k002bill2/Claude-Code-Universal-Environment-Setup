@@ -47,7 +47,7 @@
 
 ## 브라우저 검증 도구 (2026-09-15 사용자 지시)
 
-브라우저 런타임 검증은 **ego-browser(Ego Lite)** 로만 한다. Aside(`aside exec`/`aside repl`)는 2026-10-22 지시로 금지(`CLAUDE.md` ego-browser 블록, `settings.json` deny).
+브라우저 런타임 검증은 **ego-browser(Ego Lite)를 우선**한다. Aside(`aside exec`/`aside repl`)는 사용자가 지정하거나 ego 실패·미지원 또는 Aside 전용 기능이 필요한 경우에 허용하며, 자동 전환 시 `브라우저: Aside(<사유>)`를 보고한다(`CLAUDE.md` ego-browser 블록, 2026-11-14 지시).
 **Playwright·Puppeteer 를 설치하지 않는다** — 저장소는 물론 스크래치패드에 임시로 까는 것도 금지.
 `claude-in-chrome`(mcp) 도 쓰지 않는다(전역 deny).
 
