@@ -1,0 +1,42 @@
+SANDBOX=/var/folders/jh/3l0ptrs90gl5vk9_z2t7r4900000gn/T/tmp.eZ16zQHwsq
+== R2. M-1 추가: TERM 무시 + 자식 (CLAUDE_VERSION_TIMEOUT=1, 목표 <= 3.0초, 잔존 0)
+sys_trapchild      rc=0 sec=2.1 warn=0 parsefail=0 hang=[응답 없음(1초)] left=0 err=[] done=4
+gt_trapchild       rc=0 sec=2.1 warn=0 parsefail=0 hang=[응답 없음(1초)] left=0 err=[] done=4
+fb_trapchild       rc=0 sec=2.5 warn=0 parsefail=0 hang=[응답 없음(1초)] left=0 err=[] done=4
+-- 경로 확인
+/var/folders/jh/3l0ptrs90gl5vk9_z2t7r4900000gn/T/tmp.eZ16zQHwsq/p_sys/timeout
+gtimeout: none
+timeout: none
+/var/folders/jh/3l0ptrs90gl5vk9_z2t7r4900000gn/T/tmp.eZ16zQHwsq/p_gt/gtimeout
+== R3. 정규화 경계 (fake: sleep 7; echo 2.1.330 — 실효 5초면 hang(5초), 300이면 7초 후 정상)
+n_tool_[1]         rc=0 sec=1.1 warn=0 parsefail=0 hang=[응답 없음(1초)] left=0 err=[] done=4
+n_fb_[1]           rc=0 sec=1.5 warn=0 parsefail=0 hang=[응답 없음(1초)] left=0 err=[] done=4
+n_tool_[300]       rc=0 sec=7.3 warn=0 parsefail=0 hang=[] left=0 err=[] done=4
+n_fb_[300]         rc=0 sec=7.5 warn=0 parsefail=0 hang=[] left=0 err=[] done=4
+n_tool_[301]       rc=0 sec=5.1 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_fb_[301]         rc=0 sec=5.8 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_tool_[000]       rc=0 sec=5.2 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_fb_[000]         rc=0 sec=5.9 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_tool_[0300]      rc=0 sec=5.1 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_fb_[0300]        rc=0 sec=5.8 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_tool_[-1]        rc=0 sec=5.1 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_fb_[-1]          rc=0 sec=5.8 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_tool_[ 5]        rc=0 sec=5.2 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+n_fb_[ 5]          rc=0 sec=5.8 warn=0 parsefail=0 hang=[응답 없음(5초)] left=0 err=[] done=4
+== R4. I-3 v 접두 경계 (install.sh 통합 실행 + _pick_claude_version 직접 호출)
+i3_rev             rc=0 sec=0.5 warn=1 parsefail=0 hang=[] left=0 err=[] done=4
+i3_v               rc=0 sec=0.2 warn=1 parsefail=0 hang=[] left=0 err=[] done=4
+i3_paren           rc=0 sec=0.5 warn=1 parsefail=0 hang=[] left=0 err=[] done=4
+i3_dev             rc=0 sec=0.2 warn=0 parsefail=0 hang=[] left=0 err=[] done=4
+pick [rev2.1.100 2.1.330] -> 2.1.100
+pick [v2.1.292] -> 2.1.292
+pick [(v2.1.292)] -> 2.1.292
+pick [dev2.1.300] -> 2.1.300
+pick [release 3.0.0 v2.1.292] -> 2.1.292
+pick [x v2.1.292 1.0.0] -> 2.1.292
+== R5. 실제 ~/.claude 무변경 (마커 → install.sh HOME=샌드박스 → find -newer)
+r5 install rc=0 sandbox files=53
+real ~/.claude changed paths during run: 0
+installer-output top-level: . .manifest .settings-manifest docs projects rules settings.json skills 
+intersection (changed ∩ installer paths): 0
+S=/var/folders/jh/3l0ptrs90gl5vk9_z2t7r4900000gn/T/tmp.eZ16zQHwsq

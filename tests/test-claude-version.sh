@@ -91,4 +91,84 @@ run_with v6 "2.1.292" --dry-run --components commands; RC=$?
 [ "$RC" -eq 0 ] && pass "V6 dry-run exit 0" || fail "V6 exit ${RC}"
 grep -q -- "$WARN_RE" "$OUT" && pass "V6 dry-run 경고" || fail "V6 경고 없음"
 
+# L-1 토큰 선택 규칙
+run_with t1 "built 2026.11.22 version 2.1.292" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T1 exit 0" || fail "T1 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && pass "T1 built…version 2.1.292 경고" || fail "T1 경고 없음"
+mkclaude "${SANDBOX_ROOT}/t2-bin" "build 2026.11.22
+2.1.330 (Claude Code)"
+mkdir -p "${SANDBOX_ROOT}/t2-home" "${SANDBOX_ROOT}/t2-proj"
+HOME="${SANDBOX_ROOT}/t2-home" PATH="${SANDBOX_ROOT}/t2-bin:${SANDBOX_ROOT}/shims:$PATH" bash "${R}/install.sh" \
+    --project "${SANDBOX_ROOT}/t2-proj" --components commands > "$OUT" 2>&1 < /dev/null; RC=$?
+[ "$RC" -eq 0 ] && pass "T2 exit 0" || fail "T2 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && fail "T2 경고 오발" || pass "T2 (Claude Code) 우선 → 경고 없음"
+run_with t3 "release 3.0.0 v2.1.292" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T3 exit 0" || fail "T3 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && pass "T3 v 접두사 2순위 경고" || fail "T3 경고 없음"
+
+# L-2 타임아웃 (일반 경로 + CC_VERSION_FORCE_BASH_TIMEOUT=1 폴백 경로)
+SLEEP_MARK="sleep 37"
+for mode in native bash; do
+    n="to-$mode"
+    mkdir -p "${SANDBOX_ROOT}/$n-home" "${SANDBOX_ROOT}/$n-proj" "${SANDBOX_ROOT}/$n-bin"
+    printf '#!/bin/bash\nsleep 37; echo 2.1.292\n' > "${SANDBOX_ROOT}/$n-bin/claude"
+    chmod +x "${SANDBOX_ROOT}/$n-bin/claude"
+    force=""; [ "$mode" = bash ] && force=1
+    T0=$SECONDS
+    CC_VERSION_FORCE_BASH_TIMEOUT="$force" CLAUDE_VERSION_TIMEOUT=1 HOME="${SANDBOX_ROOT}/$n-home" \
+        PATH="${SANDBOX_ROOT}/$n-bin:${SANDBOX_ROOT}/shims:$PATH" bash "${R}/install.sh" \
+        --project "${SANDBOX_ROOT}/$n-proj" --components commands > "$OUT" 2>&1 < /dev/null; RC=$?
+    EL=$((SECONDS - T0))
+    [ "$RC" -eq 0 ] && pass "TO($mode) exit 0" || fail "TO($mode) exit ${RC}"
+    grep -q '응답 없음(1초)' "$OUT" && pass "TO($mode) 응답 없음 WARN" || fail "TO($mode) WARN 없음"
+    grep -q -- "$WARN_RE" "$OUT" && fail "TO($mode) 버전 경고 오발" || pass "TO($mode) 버전 경고 없음"
+    [ "$EL" -lt 10 ] && pass "TO($mode) ${EL}s < 10s" || fail "TO($mode) ${EL}s 초과"
+    pgrep -f "$SLEEP_MARK" >/dev/null 2>&1 && fail "TO($mode) 잔존 프로세스" || pass "TO($mode) 잔존 프로세스 0"
+done
+
+# 정상 fake 는 타임아웃 경로를 타지 않음 (즉시 응답, 경고 없음)
+run_with t4 "2.1.330 (Claude Code)" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T4 exit 0" || fail "T4 exit ${RC}"
+grep -q '응답 없음' "$OUT" && fail "T4 타임아웃 오발" || pass "T4 타임아웃 미발동"
+
+# 헬퍼: 지정 스크립트 본문의 fake claude 로 install 실행 (env 는 호출부에서 prefix)
+run_fake() {  # $1=name $2=스크립트 본문
+    local n="$1"
+    mkdir -p "${SANDBOX_ROOT}/$n-home" "${SANDBOX_ROOT}/$n-proj" "${SANDBOX_ROOT}/$n-bin"
+    printf '#!/bin/bash\n%s\n' "$2" > "${SANDBOX_ROOT}/$n-bin/claude"
+    chmod +x "${SANDBOX_ROOT}/$n-bin/claude"
+    HOME="${SANDBOX_ROOT}/$n-home" PATH="${SANDBOX_ROOT}/$n-bin:${SANDBOX_ROOT}/shims:$PATH" \
+        bash "${R}/install.sh" --project "${SANDBOX_ROOT}/$n-proj" --components commands \
+        > "$OUT" 2>&1 < /dev/null
+}
+
+# M-1 TERM 무시 CLI → KILL 승격
+for mode in native bash; do
+    force=""; [ "$mode" = bash ] && force=1
+    T0=$SECONDS
+    CC_VERSION_FORCE_BASH_TIMEOUT="$force" CLAUDE_VERSION_TIMEOUT=1 run_fake "tm-$mode" "trap '' TERM; sleep 43; echo 2.1.292"; RC=$?
+    EL=$((SECONDS - T0))
+    [ "$RC" -eq 0 ] && pass "M1($mode) exit 0" || fail "M1($mode) exit ${RC}"
+    grep -q '응답 없음(1초)' "$OUT" && pass "M1($mode) 응답 없음 WARN" || fail "M1($mode) WARN 없음"
+    [ "$EL" -lt 6 ] && pass "M1($mode) ${EL}s < 6s" || fail "M1($mode) ${EL}s 초과"
+    pgrep -f "sleep 43" >/dev/null 2>&1 && fail "M1($mode) 잔존" || pass "M1($mode) 잔존 0"
+done
+
+# L-3~L-5 CLAUDE_VERSION_TIMEOUT 정규화 (폴백 경로)
+for pair in "00|5" "08|8" "99999999999999999999|5"; do
+    val="${pair%%|*}"; eff="${pair#*|}"
+    CC_VERSION_FORCE_BASH_TIMEOUT=1 CLAUDE_VERSION_TIMEOUT="$val" run_fake "nz-$eff-${#val}" "sleep 12; echo 2.1.292"; RC=$?
+    [ "$RC" -eq 0 ] && pass "NZ($val) exit 0" || fail "NZ($val) exit ${RC}"
+    grep -q "응답 없음(${eff}초)" "$OUT" && pass "NZ($val) 실효 ${eff}초" || fail "NZ($val) 실효 초 불일치"
+    grep -q 'value too great' "$OUT" && fail "NZ($val) 산술 오류" || pass "NZ($val) 산술 오류 0"
+    pgrep -f "sleep 12" >/dev/null 2>&1 && fail "NZ($val) 잔존" || pass "NZ($val) 잔존 0"
+done
+
+# I-3 v 접두 단어 경계
+run_with b1 "dev2.1.300" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "B1 exit 0" || fail "B1 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && fail "B1 dev2.1.300 경고 오발" || pass "B1 dev2.1.300 경고 없음"
+run_with b2 "rev2.1.100 2.1.330" --components commands; RC=$?
+grep -q -- "$WARN_RE" "$OUT" && pass "B2 3순위 첫 토큰 2.1.100 → 경고" || fail "B2 경고 없음"
+
 finish
