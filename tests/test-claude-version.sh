@@ -91,4 +91,44 @@ run_with v6 "2.1.292" --dry-run --components commands; RC=$?
 [ "$RC" -eq 0 ] && pass "V6 dry-run exit 0" || fail "V6 exit ${RC}"
 grep -q -- "$WARN_RE" "$OUT" && pass "V6 dry-run 경고" || fail "V6 경고 없음"
 
+# L-1 토큰 선택 규칙
+run_with t1 "built 2026.11.22 version 2.1.292" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T1 exit 0" || fail "T1 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && pass "T1 built…version 2.1.292 경고" || fail "T1 경고 없음"
+mkclaude "${SANDBOX_ROOT}/t2-bin" "build 2026.11.22
+2.1.330 (Claude Code)"
+mkdir -p "${SANDBOX_ROOT}/t2-home" "${SANDBOX_ROOT}/t2-proj"
+HOME="${SANDBOX_ROOT}/t2-home" PATH="${SANDBOX_ROOT}/t2-bin:${SANDBOX_ROOT}/shims:$PATH" bash "${R}/install.sh" \
+    --project "${SANDBOX_ROOT}/t2-proj" --components commands > "$OUT" 2>&1 < /dev/null; RC=$?
+[ "$RC" -eq 0 ] && pass "T2 exit 0" || fail "T2 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && fail "T2 경고 오발" || pass "T2 (Claude Code) 우선 → 경고 없음"
+run_with t3 "release 3.0.0 v2.1.292" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T3 exit 0" || fail "T3 exit ${RC}"
+grep -q -- "$WARN_RE" "$OUT" && pass "T3 v 접두사 2순위 경고" || fail "T3 경고 없음"
+
+# L-2 타임아웃 (일반 경로 + CC_VERSION_FORCE_BASH_TIMEOUT=1 폴백 경로)
+SLEEP_MARK="sleep 37"
+for mode in native bash; do
+    n="to-$mode"
+    mkdir -p "${SANDBOX_ROOT}/$n-home" "${SANDBOX_ROOT}/$n-proj" "${SANDBOX_ROOT}/$n-bin"
+    printf '#!/bin/bash\nsleep 37; echo 2.1.292\n' > "${SANDBOX_ROOT}/$n-bin/claude"
+    chmod +x "${SANDBOX_ROOT}/$n-bin/claude"
+    force=""; [ "$mode" = bash ] && force=1
+    T0=$SECONDS
+    CC_VERSION_FORCE_BASH_TIMEOUT="$force" CLAUDE_VERSION_TIMEOUT=1 HOME="${SANDBOX_ROOT}/$n-home" \
+        PATH="${SANDBOX_ROOT}/$n-bin:${SANDBOX_ROOT}/shims:$PATH" bash "${R}/install.sh" \
+        --project "${SANDBOX_ROOT}/$n-proj" --components commands > "$OUT" 2>&1 < /dev/null; RC=$?
+    EL=$((SECONDS - T0))
+    [ "$RC" -eq 0 ] && pass "TO($mode) exit 0" || fail "TO($mode) exit ${RC}"
+    grep -q '응답 없음(1초)' "$OUT" && pass "TO($mode) 응답 없음 WARN" || fail "TO($mode) WARN 없음"
+    grep -q -- "$WARN_RE" "$OUT" && fail "TO($mode) 버전 경고 오발" || pass "TO($mode) 버전 경고 없음"
+    [ "$EL" -lt 10 ] && pass "TO($mode) ${EL}s < 10s" || fail "TO($mode) ${EL}s 초과"
+    pgrep -f "$SLEEP_MARK" >/dev/null 2>&1 && fail "TO($mode) 잔존 프로세스" || pass "TO($mode) 잔존 프로세스 0"
+done
+
+# 정상 fake 는 타임아웃 경로를 타지 않음 (즉시 응답, 경고 없음)
+run_with t4 "2.1.330 (Claude Code)" --components commands; RC=$?
+[ "$RC" -eq 0 ] && pass "T4 exit 0" || fail "T4 exit ${RC}"
+grep -q '응답 없음' "$OUT" && fail "T4 타임아웃 오발" || pass "T4 타임아웃 미발동"
+
 finish

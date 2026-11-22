@@ -520,14 +520,70 @@ check_prereqs() {
 # 미만이면 경고만 한다(설치 계속, exit 코드 불변). --dry-run 에서도 동작(읽기 전용).
 MIN_CLAUDE_VERSION="2.1.293"
 
+# 하위 프로세스 트리 종료 (bash 폴백 타임아웃용). $1=pid
+_kill_tree() {
+    local pid="$1" child
+    for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+        _kill_tree "$child"
+    done
+    kill "$pid" 2>/dev/null || true
+}
+
+# `claude --version` 을 $1 초 제한으로 실행해 stdout 을 출력한다. 초과 시 return 124.
+# 우선순위: timeout → gtimeout → 순수 bash 폴백.
+# 테스트 전용 env CC_VERSION_FORCE_BASH_TIMEOUT=1 이면 폴백 경로를 강제한다.
+_claude_version_with_timeout() {
+    local secs="$1" tmp pid i rc=0 tool=""
+    if [ "${CC_VERSION_FORCE_BASH_TIMEOUT:-}" != "1" ]; then
+        if command -v timeout >/dev/null 2>&1; then tool="timeout"
+        elif command -v gtimeout >/dev/null 2>&1; then tool="gtimeout"; fi
+    fi
+    if [ -n "$tool" ]; then
+        "$tool" "$secs" claude --version 2>/dev/null </dev/null || rc=$?
+        return "$rc"
+    fi
+    tmp="$(mktemp)" || return 0
+    claude --version >"$tmp" 2>/dev/null </dev/null &
+    pid=$!
+    i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$i" -ge "$((secs * 5))" ]; then
+            _kill_tree "$pid"
+            { wait "$pid"; } 2>/dev/null || true
+            rm -f "$tmp"
+            return 124
+        fi
+        sleep 0.2
+        i=$((i + 1))
+    done
+    { wait "$pid"; } 2>/dev/null || rc=$?
+    cat "$tmp"
+    rm -f "$tmp"
+    return "$rc"
+}
+
+# 버전 토큰 선택: 1) 'X.Y.Z (Claude Code)' 2) 'version |Version |v' 뒤 X.Y.Z 3) 첫 X.Y.Z
+_pick_claude_version() {
+    local raw="$1" v re='[0-9]+\.[0-9]+\.[0-9]+'
+    v="$(printf '%s\n' "$raw" | grep -Eo "${re}[^ ]* \(Claude Code\)" | head -n 1 | grep -Eo "^${re}" || true)"
+    [ -z "$v" ] && v="$(printf '%s\n' "$raw" | grep -Eo "(version |Version |v)${re}" | head -n 1 | grep -Eo "${re}\$" || true)"
+    [ -z "$v" ] && v="$(printf '%s\n' "$raw" | grep -Eo "$re" | head -n 1 || true)"
+    printf '%s' "$v"
+}
+
 check_claude_version() {
-    local raw ver cur min i c m
+    local raw ver cur min i c m secs="${CLAUDE_VERSION_TIMEOUT:-5}" rc=0
     if ! command -v claude >/dev/null 2>&1; then
         log_info "claude CLI 미발견 — 버전 점검 생략"
         return 0
     fi
-    raw="$(claude --version 2>/dev/null || true)"
-    ver="$(printf '%s\n' "$raw" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+    case "$secs" in ''|*[!0-9]*|0) secs=5 ;; esac
+    raw="$(_claude_version_with_timeout "$secs")" || rc=$?
+    if [ "$rc" -eq 124 ]; then
+        log_warn "claude --version 응답 없음(${secs}초) — 버전 점검 생략"
+        return 0
+    fi
+    ver="$(_pick_claude_version "$raw")"
     if [ -z "$ver" ]; then
         log_warn "claude --version 출력에서 버전을 읽지 못했습니다 — 버전 점검 생략"
         return 0
