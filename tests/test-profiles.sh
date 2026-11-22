@@ -247,6 +247,9 @@ if git -C "$R" archive c39be55 2>/dev/null | tar -x -C "$BASE" 2>/dev/null && [ 
     # 오래된 macOS 체크아웃은 같은 이름이 NFD 로 남아 있어, 내용이 같아도 경로 문자열이
     # 달라 스냅샷 비교가 실패한다(설치기 로직과 무관한 체크아웃 환경 차이).
     rm -rf "$BASE/docs" && cp -R "$R/docs" "$BASE/docs"
+    # examples/ 도 페이로드(예시 에이전트·스킬 문구)라 현재 사본으로 맞춘다 — 문구 갱신이
+    # 설치기 로직 회귀로 오판되지 않게 한다.
+    rm -rf "$BASE/examples" && cp -R "$R/examples" "$BASE/examples"
     newenv f0
     run_inst "$BASE" "$(H f0)" --full --project "$(P f0)" || fail "P8 변경 전 --full exit≠0"
     # .settings-manifest 는 push identity 기록 1건 차이를 담는다 — 아래에서 따로 검증

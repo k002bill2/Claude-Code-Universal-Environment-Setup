@@ -59,7 +59,7 @@ model: sonnet
 model: opus
 
 # Full model ID
-model: claude-haiku-4-5-20251001
+model: claude-haiku-5-5
 ```
 
 ### `disable-model-invocation`
