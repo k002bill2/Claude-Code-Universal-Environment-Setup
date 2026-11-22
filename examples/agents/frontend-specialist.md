@@ -4,7 +4,7 @@ name: frontend-specialist
 description: React/Next.js component development, optimization, and testing
 tools: Edit, Write, Read, Grep, Glob, Bash
 model: sonnet
-# 참고: effort/maxTurns/disallowedTools는 환경별 지원 차이가 있어 권장 X.
+# 참고: effort/maxTurns/disallowedTools는 공식 지원 필드(code.claude.com/docs/en/sub-agents). 필요할 때만 지정.
 # 대신 tools 화이트리스트로 제한하는 것이 안전합니다.
 ---
 

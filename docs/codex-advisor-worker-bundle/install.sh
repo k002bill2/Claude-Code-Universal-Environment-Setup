@@ -1325,7 +1325,7 @@ worker 보고 수신: 가능하면 동기 실행으로 결과를 직접 받는�
 모드 B는 소진 "대비" 절약책이지 소진 "후" 대책이 아니다 — 모드 B에서도 architect·worker는 그대로 opus를 호출한다.
 Opus 소진 후 경로는 둘: (a) 두 에이전트의 model: 을 sonnet 으로 임시 하향, (b) /codex:rescue 로 Codex(별도 한도)에 위임.
 
-**상향 경로 — Fable 5 (명시적 opt-in 전용, $10/$50 per 1M — Opus 5 의 2배):** 자동 승격 없음. 다음 두 경우에 사용자가 명시적으로 지시할 때만:
+**상향 경로 — Fable 5.2 (`fable` 별칭 · 명시적 opt-in 전용, $8/$40 per 1M — Opus 5.5 의 2배):** 자동 승격 없음. 다음 두 경우에 사용자가 명시적으로 지시할 때만:
 - 실패 비용이 큰 1회성 최난도 판단 (되돌리기 어려운 마이그레이션 설계, 아키텍처 분기 결정)
 - 감독 없이 오래 도는 장기 자율 실행
 그 외에는 Opus 5.5 가 기본이다. "어려워 보인다"는 승격 사유가 아니다 — effort 를 먼저 올린다.
@@ -1339,7 +1339,7 @@ Opus 소진 후 경로는 둘: (a) 두 에이전트의 model: 을 sonnet 으로 
 - 세션 도중 변경은 캐시를 무효화한다 — 작업 시작 시 정하고, 부득이하면 `/effort` 의 `s`(세션 한정)로.
 - 함정: top-level `effortLevel` 은 Opus 5.5 이후 모델에 적용되지 않는다 — 5.5 레벨은 `modelSettings` 로만.
   우선순위: `CLAUDE_CODE_EFFORT_LEVEL` > `--effort`/`/effort` > settings > 모델 기본.
-- Codex 검증 effort는 ~/.codex/config.toml 의 model_reasoning_effort 로 조절(high 권장).
+- Codex 검증 effort는 ~/.codex/config.toml 의 model_reasoning_effort 로 조절(기본 medium — 리뷰 누락이 반복될 때만 high).
 
 ## 토큰 무거운 작업
 **1M 메인이 직접 읽는 것이 기본값이다.** 대량 입력을 analyzer 등에 먼저 위임하는 의무는 폐기했다 —
@@ -1580,8 +1580,8 @@ mkdir -p "${CODEX_DIR}"
 if [ ! -f "${CODEX_DIR}/config.toml" ]; then
   cat > "${CODEX_DIR}/config.toml" <<'CODEXCFG'
 # Codex 검증 기본값 (원하는 값으로 조정)
-# model = "gpt-5.5"             # 리뷰 모델 명시 예시 (미지정 시 CLI 기본값 사용)
-model_reasoning_effort = "high"
+# model = "<모델명>"            # 리뷰 모델 명시 예시 (미지정 시 CLI 기본값 사용, 목록은 codex 의 /model)
+model_reasoning_effort = "medium"   # 리뷰 누락이 반복될 때만 high
 CODEXCFG
   echo "  생성 완료: ${CODEX_DIR}/config.toml"
 else
