@@ -46,6 +46,21 @@ for v in 2.1.293 2.1.330 2.2.0 3.0.0; do
     grep -q -- "$WARN_RE" "$OUT" && fail "V2 $v 경고 오발" || pass "V2 $v 경고 없음"
 done
 
+# 정규식 회귀: 2자리 메이저 앞자리 손실 금지 → 경고 없음
+for pair in "m10|10.0.0 (Claude Code)" "m12|claude 12.3.4"; do
+    n="${pair%%|*}"; v="${pair#*|}"
+    run_with "$n" "$v" --components commands; RC=$?
+    [ "$RC" -eq 0 ] && pass "V7 '$v' exit 0" || fail "V7 '$v' exit ${RC}"
+    grep -q -- "$WARN_RE" "$OUT" && fail "V7 '$v' 경고 오발" || pass "V7 '$v' 경고 없음"
+done
+# 접두사 v / 접미사 → 2.1.292 로 읽혀 경고
+for pair in "pv|v2.1.292" "sb|2.1.292-beta.1 (Claude Code)"; do
+    n="${pair%%|*}"; v="${pair#*|}"
+    run_with "$n" "$v" --components commands; RC=$?
+    [ "$RC" -eq 0 ] && pass "V8 '$v' exit 0" || fail "V8 '$v' exit ${RC}"
+    grep -q -- "$WARN_RE" "$OUT" && pass "V8 '$v' 경고" || fail "V8 '$v' 경고 없음"
+done
+
 # 문자열 비교 회귀: 2.1.29 < 2.1.293
 run_with v3 "2.1.29 (Claude Code)" --components commands; RC=$?
 [ "$RC" -eq 0 ] && pass "V3 2.1.29 exit 0" || fail "V3 exit ${RC}"

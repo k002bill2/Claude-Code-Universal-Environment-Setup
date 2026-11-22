@@ -527,7 +527,7 @@ check_claude_version() {
         return 0
     fi
     raw="$(claude --version 2>/dev/null || true)"
-    ver="$(printf '%s\n' "$raw" | sed -n 's/.*[^0-9.]\{0,1\}\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1 || true)"
+    ver="$(printf '%s\n' "$raw" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
     if [ -z "$ver" ]; then
         log_warn "claude --version 출력에서 버전을 읽지 못했습니다 — 버전 점검 생략"
         return 0
